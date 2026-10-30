@@ -303,3 +303,4 @@ input.text:focus-visible { border-color: var(--accent); }
 .room { display: flex; align-items: center; gap: 16px; padding: 8px 20px 6px; }
 .room-code { font: 700 30px/1 var(--font); letter-spacing: 0.16em; color: var(--accent); user-select: text; }
 .btn[disabled] { opacity: 0.5; cursor: default; }
+.help.open { white-space: pre-line; }

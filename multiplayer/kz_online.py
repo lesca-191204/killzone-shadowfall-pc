@@ -146,10 +146,14 @@ class Online:
         self.close()
         identity = room_host.discover_identity(host_ip=host_ip)
         prepared = room_host.prepare_host(self.data, identity, room_host.find_openssl(HERE))
+        # Rooms a closed or killed server left behind (each room is a temporary folder).
+        for stale in (prepared.key.parent / 'rooms').glob('room-*'):
+            shutil.rmtree(stale, ignore_errors=True)
         archive = self.data / 'Host-connection.zip'
         room_host.export_connection(prepared, archive)
-        self.gateway = subprocess.Popen(room_host.gateway_command(HERE, prepared), cwd=str(HERE),
-                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        # --managed: "stop" on stdin ends it cleanly (its room folder is removed).
+        self.gateway = subprocess.Popen([*room_host.gateway_command(HERE, prepared), '--managed'], cwd=str(HERE),
+                                        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True,
                                         stderr=subprocess.DEVNULL, env=self._environment(),
                                         creationflags=NO_WINDOW)
         tie_to_this_process(self.gateway)
@@ -205,7 +209,12 @@ class Online:
             except (OSError, ValueError, subprocess.TimeoutExpired):
                 bridge.terminate()
         if gateway and gateway.poll() is None:
-            gateway.terminate()
+            try:
+                gateway.stdin.write('stop\n')
+                gateway.stdin.flush()
+                gateway.wait(timeout=5)
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                gateway.terminate()
 
 
 def online_user(port, source):

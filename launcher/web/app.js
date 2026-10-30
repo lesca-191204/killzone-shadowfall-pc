@@ -313,6 +313,8 @@ function onlineAnswer(r) {
 function onlinePage() {
   const o = S.online || {};
   const out = [h('div.banner.warn', icon('alert'), h('div', T('online_warning')))];
+  if (!o.room) out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_steps'))),
+    h('div.card-help', h('div.help.open', T('online_steps_help')))));
   if (o.missing) return [...out, h('div.banner.warn', icon('x'), h('div', o.missing))];
   const net = o.network || {};
   const level = { radmin: 'ok', tailscale: 'ok', lan: 'warn' }[net.kind] || 'error';
@@ -323,8 +325,10 @@ function onlinePage() {
       h('button.btn.ghost', { onclick: () => api().online_info().then(onlineAnswer) }, icon('reset'), T('online_refresh')),
       h('button.btn', { onclick: () => api().open_url('radmin') }, icon('download'), T('online_get_radmin')))));
   const busy = o.busy || ui.onlineBusy;
-  const saves = h('section.card', h('div.card-head', h('div.card-title', T('online_saves'))),
-    h('div.card-help', h('div.help.open', T('online_saves_help'))));
+  const saves = [h('section.card', h('div.card-head', h('div.card-title', T('online_notes'))),
+    h('div.card-help', h('div.help.open', T('online_notes_help')))),
+    h('section.card', h('div.card-head', h('div.card-title', T('online_saves'))),
+    h('div.card-help', h('div.help.open', T('online_saves_help'))))];
   if (o.room) {
     const room = o.room;
     out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_room'))),

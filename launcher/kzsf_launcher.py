@@ -2128,6 +2128,11 @@ class Launcher:
             self.button(frame, busy or self.ot('online_join_button'),
                         lambda: self.online_start(nickname.get().strip(), self.online_connection, code.get().strip()),
                         primary=True).pack(side='left', padx=self.px(12))
+        if not room:
+            self.heading(parent, self.ot('online_steps'), pady=(18, 6))
+            self.note(parent, self.ot('online_steps_help'))
+        self.heading(parent, self.ot('online_notes'), pady=(18, 6))
+        self.note(parent, self.ot('online_notes_help'))
         self.heading(parent, self.ot('online_saves'), pady=(18, 6))
         self.note(parent, self.ot('online_saves_help'))
 

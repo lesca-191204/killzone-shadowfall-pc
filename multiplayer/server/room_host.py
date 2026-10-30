@@ -204,8 +204,11 @@ def _validate_key_permissions(host: Path, key: Path):
     sid = _windows_account_sid()
     rows = [_windows_permissions(path) for path in (host, key)]
     allowed = {sid, 'S-1-5-18'}
+    # Windows makes Administrators the owner of what an elevated program (or any program, with UAC
+    # off) creates; they can read every file anyway. Access stays limited to this account and SYSTEM.
+    owners = allowed | {'S-1-5-32-544'}
     if (not isinstance(rows, list) or len(rows) != 2
-            or any(not isinstance(row, dict) or row.get('owner') != sid
+            or any(not isinstance(row, dict) or row.get('owner') not in owners
                    or not isinstance(row.get('allow'), list) or not row['allow']
                    or any(principal not in allowed for principal in row['allow']) for row in rows)
             or rows[0].get('protected') is not True):

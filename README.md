@@ -17,8 +17,9 @@ Native Windows port of **Killzone Shadow Fall** (PS4). The game's code runs dire
 graphics are translated to Vulkan in real time. **Public beta:** the whole campaign is playable,
 and it keeps improving with every report.
 
-> 🆕 **0.6.0:** 🎮 **Xbox button icons** · 🏔️ **detail distance (LOD)** · 🔭 **FOV up to 200%** ·
-> 🚀 faster shaders · 🛠️ **12 issues fixed or improved** (crashes, AMD, 4 GB cards, launcher).
+> 🆕 **0.7.0:** 🛡️ **god mode without hit effects** · 🚀 **faster GPU threads** (+38% draws/s) ·
+> 🌍 **game language option** · ⌨️ **remappable movement keys and touchpad swipes** · ⏱️ **live FPS
+> limit and smoother pacing** · 🛠️ **25 issues fixed** (long folder paths, AMD FSR 3.1, cutscene upscaling, old CPUs, updates).
 
 > ⚠️ **No game files are included.** You need your own dumped copy of the game, **version 01.81**:
 > **CUSA00190** (the tested one) or another region (see [Game versions](#-game-versions)). This
@@ -251,7 +252,7 @@ the launcher (*Graphics → Image*) or change it **live** in *Insert → Image �
 
 | Cheat | What it does |
 |---|---|
-| 🛡️ **God mode** | You take no damage |
+| 🛡️ **God mode** | You take no damage, with no red screen, hit markers or shake |
 | 🔫 **Infinite ammo** | Reserve ammo and grenades are never used up |
 | ♻️ **No reload** | The magazine never empties |
 | 🏃 **Unlimited sprint** | Stamina refills while you sprint |
@@ -299,7 +300,7 @@ keyboard, mouse and controller mapping · FOV · quick links to saves, screensho
 |---|---|---|
 | CUSA00190 | USA | ✅ Tested (the port's reference) |
 | CUSA00191 | Latin America | ⚠️ Not tested, may work |
-| CUSA00002 | Europe | ⚠️ Not tested, may work (choose the language in the game's options) |
+| CUSA00002 | Europe | ⚠️ Not tested, may work (choose your copy's language in *Launcher → Advanced → Game*) |
 | CUSA00085 | Japan | ⚠️ Not tested; Japanese texts may look wrong or be missing |
 
 - **Version 01.81 is required** in every region (base game or its update).
@@ -331,10 +332,11 @@ Reports (distro or Steam Deck, Proton version, GPU) are welcome on Discord or in
 
 ## 🗺️ Roadmap
 
-**✅ Done in 0.6.0:** 🎮 Xbox button icons · 🏔️ detail distance (LOD) · 🔭 FOV up to 200% ·
-🚀 faster and more correct shaders · 🛠️ crash fixes and launcher fixes.
+**✅ Done in 0.7.0:** 🛡️ god mode without hit effects · 🚀 faster GPU threads · 🌍 game language ·
+⌨️ remappable movement and swipes · ⏱️ live FPS limit and pacing · 🛠️ 25 issues fixed.
 
 **🔜 Coming next:** the port is nearly complete in features, so the focus now is
+- 📦 **DLC support** (#4 / #15): the multiplayer map packs in offline Botzone.
 - 🐞 **Stability and crashes**, above all on **Intel Arc** and **AMD** graphics.
 - 🧩 **Compatibility** with other regions and dumps, and the remaining issues.
 - 🌍 **More languages in the launcher.**
@@ -379,8 +381,9 @@ Port nativo para Windows de **Killzone Shadow Fall** (PS4). El código del juego
 en tu CPU; los gráficos se traducen a Vulkan en tiempo real. **Beta pública:** se puede jugar la
 campaña completa, y mejora con cada reporte.
 
-> 🆕 **0.6.0:** 🎮 **íconos de botones de Xbox** · 🏔️ **distancia de detalle (LOD)** · 🔭 **FOV hasta 200%** ·
-> 🚀 shaders más rápidos · 🛠️ **12 issues corregidos o mejorados** (crashes, AMD, placas de 4 GB, launcher).
+> 🆕 **0.7.0:** 🛡️ **modo dios sin efectos de golpe** · 🚀 **hilos de GPU más rápidos** (+38% de dibujos/s) ·
+> 🌍 **opción de idioma del juego** · ⌨️ **teclas de movimiento y deslizamientos del touchpad reasignables** ·
+> ⏱️ **límite de FPS en vivo y ritmo más parejo** · 🛠️ **25 issues corregidos** (rutas largas, FSR 3.1 en AMD, escalado en cinemáticas, CPUs viejos, actualizaciones).
 
 > ⚠️ **No incluye archivos del juego.** Necesitás tu propia copia dumpeada del juego, **versión
 > 01.81**: **CUSA00190** (la probada) u otra región (ver [Versiones del juego](#️-versiones-del-juego)).
@@ -618,7 +621,7 @@ y CPU. Más bajo: **más FPS**. Se ajusta en el launcher (*Gráficos → Imagen*
 
 | Truco | Qué hace |
 |---|---|
-| 🛡️ **Modo dios** | No recibís daño |
+| 🛡️ **Modo dios** | No recibís daño, sin pantalla roja, marcas de golpe ni sacudidas |
 | 🔫 **Munición infinita** | La munición de reserva y las granadas no se gastan |
 | ♻️ **Sin recarga** | El cargador nunca se vacía |
 | 🏃 **Sprint ilimitado** | La resistencia se recarga mientras corrés |
@@ -667,7 +670,7 @@ partidas, capturas y logs.
 |---|---|---|
 | CUSA00190 | EE. UU. | ✅ Probada (la referencia del port) |
 | CUSA00191 | Latinoamérica | ⚠️ No probada, puede funcionar |
-| CUSA00002 | Europa | ⚠️ No probada, puede funcionar (el idioma se elige en las opciones del juego) |
+| CUSA00002 | Europa | ⚠️ No probada, puede funcionar (elegí el idioma de tu copia en *Launcher → Avanzado → Juego*) |
 | CUSA00085 | Japón | ⚠️ No probada; los textos en japonés pueden verse mal o faltar |
 
 - **Es obligatoria la versión 01.81** en cualquier región (juego base o su actualización).
@@ -701,10 +704,12 @@ Linux (AppImage).
 
 ## 🗺️ Próximamente
 
-**✅ Hecho en 0.6.0:** 🎮 íconos de botones de Xbox · 🏔️ distancia de detalle (LOD) · 🔭 FOV hasta
-200% · 🚀 shaders más rápidos y correctos · 🛠️ correcciones de crashes y del launcher.
+**✅ Hecho en 0.7.0:** 🛡️ modo dios sin efectos de golpe · 🚀 hilos de GPU más rápidos · 🌍 idioma
+del juego · ⌨️ movimiento y deslizamientos reasignables · ⏱️ límite de FPS en vivo y ritmo · 🛠️ 25
+issues corregidos.
 
 **🔜 Lo que viene:** el port ya está casi completo en funciones, así que ahora el foco es
+- 📦 **Soporte de DLC** (#4 / #15): los packs de mapas multijugador en el Botzone sin conexión.
 - 🐞 **Estabilidad y crashes**, sobre todo en gráficas **Intel Arc** y **AMD**.
 - 🧩 **Compatibilidad** con otras regiones y dumps, y los issues que quedan.
 - 🌍 **Más idiomas en el launcher.**
@@ -747,9 +752,10 @@ compilá antes el puente con Visual Studio 2022 y el [SDK de NVIDIA DLSS](https:
 - **shadPS4 team**: the [shadPS4](https://github.com/shadps4-emu/shadPS4) video core (GPU and
   shader translation to Vulkan).
 - **clearfeather**: startup crash fix for base 01.00 + update installs (file symlink stat, PR #31),
-  controller/audio suggestions and the controller quick menu idea (#49).
+  the fast sharded rwlock registry (PR #96, on by default since 0.7.0), controller/audio
+  suggestions and the controller quick menu idea (#49).
 - **pearlxcore**: [KillzoneShadowFall-PC](https://github.com/pearlxcore/KillzoneShadowFall-PC), whose
-  free camera math, Tactical Echo patch and effect toggles were adapted here.
+  free camera math, Tactical Echo patch, effect toggles and god mode damage skip were adapted here.
 - **AMD FidelityFX FSR 3.1** ([FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan)), **AMD FSR 4**
   (v07 INT8 shaders from [FireBurn/Q2RTX](https://github.com/FireBurn/Q2RTX), MIT) and **NVIDIA
   DLSS** ([DLSS SDK](https://github.com/NVIDIA/DLSS); NVIDIA's license is in `licenses\`).

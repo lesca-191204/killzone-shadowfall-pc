@@ -436,3 +436,11 @@ target_link_libraries(fsr4-bench PRIVATE ffx-vulkan::fsr4-v07-vulkan ffx-vulkan:
 
 add_executable(cheat-hook-test ../tests/test_cheat_hook.cpp)
 target_compile_options(cheat-hook-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+
+# Isolated runtime tests exercise both the stock and experimental backends.
+add_executable(rwlock-isolated-test EXCLUDE_FROM_ALL ../tests/test_rwlock_isolated.c
+    ../src/runtime_rwlock.c ../src/runtime_rwlock_fast.c)
+set_target_properties(rwlock-isolated-test PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
+target_include_directories(rwlock-isolated-test PRIVATE ../src)
+target_compile_options(rwlock-isolated-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+target_link_libraries(rwlock-isolated-test PRIVATE -pthread)

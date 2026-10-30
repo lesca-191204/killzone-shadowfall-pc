@@ -23,6 +23,17 @@ typedef struct { int64_t seconds, nanoseconds; } GuestTime;
 static pthread_mutex_t registry_lock = PTHREAD_MUTEX_INITIALIZER;
 static Rwlock *registry;
 static size_t created, reads, writes, unlocks;
+/* Experimental backend is opt-in; stock paths below remain available for A/B. */
+uintptr_t runtime_rwlock_fast_resolve(const char *name);
+void runtime_rwlock_fast_report(void);
+static pthread_once_t backend_once=PTHREAD_ONCE_INIT;
+static int fast_backend;
+static void select_backend(void) {
+    const char *setting=getenv("GOW3_RWLOCK_FAST");
+    fast_backend=setting && !strcmp(setting,"1");
+    printf("Runtime: rwlock backend %s (experimental A/B build)\n",
+           fast_backend ? "sharded-256" : "stock");
+}
 static int32_t error(int e) {
     if (!e) return 0;
     unsigned code;
@@ -157,6 +168,8 @@ static ABI int32_t rw_destroy(Rwlock **handle) {
     pthread_mutex_unlock(&registry_lock); return error(e);
 }
 uintptr_t runtime_rwlock_resolve(const char *name) {
+    pthread_once(&backend_once,select_backend);
+    if (fast_backend) return runtime_rwlock_fast_resolve(name);
     if (!strcmp(name,"6ULAa0fq4jA#libkernel")) return (uintptr_t)rw_init;
     if (!strcmp(name,"BB+kb08Tl9A#libkernel")) return (uintptr_t)rw_destroy;
     if (!strcmp(name,"Ox9i0c7L5w0#libkernel")) return (uintptr_t)rw_read;
@@ -169,6 +182,8 @@ uintptr_t runtime_rwlock_resolve(const char *name) {
     return 0;
 }
 void runtime_rwlock_report(void) {
+    pthread_once(&backend_once,select_backend);
+    if (fast_backend) { runtime_rwlock_fast_report(); return; }
     pthread_mutex_lock(&registry_lock);
     printf("Runtime: rwlocks created=%zu, reads=%zu, writes=%zu, unlocks=%zu\n",created,reads,writes,unlocks);
     pthread_mutex_unlock(&registry_lock);

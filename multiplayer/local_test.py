@@ -22,17 +22,27 @@ PATCHES = 'Private Multiplayer - HUD Visibility;Private Multiplayer - Full Unloc
 SERVICES = ('private_service.py', 'turbine_relay.py', 'ping_service.py')
 
 
+# Two copies side by side: 1280x720 windows showing the game's own 1080p picture. No upscaler,
+# quality mode or frame generation: those size the scene for the source's output (1080p and up),
+# which drew the game in a corner of the smaller window and zoomed in.
+NATIVE_OPTIONS = {'window_size': '1280x720', 'res_method': 'patch', 'upscale_quality': 'native',
+                  'frame_gen': 'off', 'ultrawide': 'off'}
+NATIVE_SETTINGS = {'display_mode': 'windowed', 'render_resolution': 'native', 'upscale_quality': 'native'}
+DROPPED_SETTINGS = ('upscaler=', 'output_res=', 'window_size=')
+
+
 def player_dir(root, source, number):
-    """user-mp<number>: the source's launcher options and game settings, windowed at 1280x720."""
+    """user-mp<number>: the source's launcher options and game settings, windowed and native."""
     user = root / f'user-mp{number}'
     user.mkdir(parents=True, exist_ok=True)
     options = json.loads((source / 'launcher.json').read_text(encoding='utf-8'))
-    options['window_size'] = '1280x720'
+    options.update(NATIVE_OPTIONS)
     (user / 'launcher.json').write_text(json.dumps(options, indent=2), encoding='utf-8')
-    if not (user / 'settings.ini').exists() and (source / 'settings.ini').exists():
+    if (source / 'settings.ini').exists():
         lines = (source / 'settings.ini').read_text(encoding='utf-8').splitlines()
-        lines = [line for line in lines if not line.startswith(('display_mode=', 'window_size='))]
-        lines += ['display_mode=windowed', 'window_size=1280x720']
+        lines = [line for line in lines if not line.startswith(DROPPED_SETTINGS) and
+                 line.partition('=')[0] not in NATIVE_SETTINGS]
+        lines += [f'{key}={value}' for key, value in NATIVE_SETTINGS.items()]
         (user / 'settings.ini').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return user
 

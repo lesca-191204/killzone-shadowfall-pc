@@ -60,8 +60,14 @@ public:
     size_t CountBlobs(BlobType type);
     /// gow3: the name (no extension) of every blob of a type, without reading it.
     void ForEachBlobName(BlobType type, const std::function<void(std::string_view name)>& func);
+    /// gow3: reads every pipeline key, then every shader blob, on several threads ahead of the
+    /// warm-up, so the system file cache holds them when the warm-up's single reader asks (on a
+    /// hard drive or with an antivirus scanning each open, one file at a time took 30 ms: #84).
+    void StartPrefetch();
+    void StopPrefetch();
 
 private:
+    std::vector<std::jthread> prefetch_threads{};
     std::jthread io_worker{};
     std::filesystem::path cache_path{};
     bool opened{};

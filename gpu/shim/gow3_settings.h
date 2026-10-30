@@ -91,6 +91,7 @@ struct Values {
     std::atomic<int> prompt_style{0};         ///< button prompts: 0 auto, 1 keyboard/mouse, 2 PS4, 3 Xbox
     std::atomic<bool> quick_menu{true};       ///< hold Select/Back/Share: quick menu (Resume / Exit)
     std::atomic<bool> quick_menu_hint{true};  ///< startup reminder of that shortcut
+    std::atomic<int> menu_combo{0};           ///< controller shortcut of the menu: 0 R3+L2, 1 L3+R3, 2 Back+Start, 3 none
     /// Set when the in-game menu changed the upscaler or frame generation: the launcher adopts
     /// gow3.ini's upscaler/frame_gen into its own settings next time and clears it.
     std::atomic<bool> upscaling_from_menu{false};

@@ -71,6 +71,9 @@ public:
     /// Before a compute dispatch: the post-processing combine shader triggers the upscale.
     void OnDispatch(u64 cs_hash);
 
+    /// The display pass, before the frame boundary: a scaled frame that drew no UI (cutscenes,
+    /// the prologue without HUD) is upscaled here, since the upscale waits for the first UI draw.
+    void OnDisplayPass();
     /// Start of a frame in the command stream (display pass).
     bool OnFrameStart();
     bool RasterScaling() const;

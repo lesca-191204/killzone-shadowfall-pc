@@ -56,6 +56,18 @@ enum { GOW3_ECHO_LENGTH = 3 };
 static const Gow3Signature gow3_echo_site = {
     "49 89 f7 49 89 fe 48 8b 05 ?? ?? ?? ?? 48 8b 00 48 89 45 e0 e8 ?? ?? ?? ?? 49 8b 9e e0 01 00 00", 3};
 
+/* God mode without hits: int3s at "push rbp" of two functions; with god mode on they return at
+ * once. The game's own god mode keeps the health, but both still run.
+ * - The health component's damage function (0x690cf0, rdi = component, [rdi+0x38] = its
+ *   entity): skipped for the player only. Adapted from pearlxcore (kzsf_cheats_win.h).
+ * - SoldierRep::OnHitEffects (0xb9d090, reached only for the local player through 0xb820e0):
+ *   FirstPersonHitEffectsResource's blood screen, hit direction and camera shake. */
+static const Gow3Signature gow3_god_hit_site = {
+    "55 48 89 e5 41 57 41 56 41 55 41 54 53 48 81 ec 18 01 00 00 49 89 f6 48 89 fb 48 8b 05 ?? ?? ?? ?? "
+    "48 8b 00 48 89 45 d0 48 8b 43 38 48 8b 80 30 02 00 00", 0};
+static const Gow3Signature gow3_god_effects_site = {
+    "55 48 89 e5 41 57 41 56 41 55 41 54 53 48 83 ec 48 c5 fa 11 4d b4 48 89 4d a8 c5 fa 11 45 a4 49 89 f6", 0};
+
 typedef int (*Gow3CheatRead)(uintptr_t address, void *out, size_t size);
 typedef int (*Gow3CheatWrite)(uintptr_t address, const void *in, size_t size);
 /* Entity_ExportedIsPlayer (0x65dac0) dispatches vtable+0x140; these are its 01.81 cases, read

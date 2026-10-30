@@ -13,6 +13,7 @@ import base64
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -28,11 +29,12 @@ WEB_TEXTS = {
         'nav_home': 'Inicio', 'sec_display': 'Pantalla', 'sec_upscaling': 'Escalado',
         'sec_upscaling_sub': 'FSR, DLSS y modos de calidad', 'sec_image': 'Calidad de imagen',
         'sec_effects': 'Efectos', 'sec_shaders': 'Shaders', 'sec_perf': 'Rendimiento',
-        'sec_launcher': 'Launcher', 'sec_maint': 'Mantenimiento', 'sec_player': 'Jugador',
+        'sec_launcher': 'Launcher', 'sec_maint': 'Mantenimiento', 'sec_player': 'Jugador', 'sec_game': 'Juego',
         'sec_mouse': 'Mouse', 'sec_prompts': 'Interfaz', 'sec_pad': 'Mando', 'sec_pad_extra': 'Ajustes del mando',
         'sub_kbm': 'Teclado y mouse', 'sub_pad': 'Mando',
         'grp_face': 'Botones', 'grp_shoulders': 'Gatillos y sticks', 'grp_menu': 'Menú y touchpad',
-        'grp_dpad': 'Cruceta',
+        'grp_dpad': 'Cruceta · adrenalina, eco táctico, modo de disparo',
+        'grp_move': 'Movimiento (stick izquierdo)', 'grp_swipe': 'Deslizar en el touchpad · órdenes del OWL',
         'more': 'Ver más', 'less': 'Ver menos', 'cancel': 'Cancelar', 'ok': 'Aceptar', 'yes': 'Sí',
         'open_logs_q': 'Abrir logs', 'close': 'Cerrar', 'game_status': 'Estado',
         'home_sub': 'Port nativo para Windows', 'quick_links': 'Accesos rápidos',
@@ -42,22 +44,28 @@ WEB_TEXTS = {
         'support': 'Apoyá el port', 'theme': 'Tema',
         'cache_label': 'Caché de shaders', 'all_options': 'Todas las opciones',
         'all_options_help': 'Gráficos, avanzado y controles vuelven a los valores por defecto.',
-        'buttons': {'cross': 'Cruz', 'circle': 'Círculo', 'square': 'Cuadrado', 'triangle': 'Triángulo',
-                    'l1': 'L1', 'r1': 'R1', 'l2': 'L2 · apuntar', 'r2': 'R2 · disparar', 'l3': 'L3 · stick izquierdo',
-                    'r3': 'R3 · stick derecho', 'options': 'Options', 'touchpad_left': 'Touchpad · clic izquierdo',
+        # What each button does in the game (issue #74), from the game's own controller legend.
+        'buttons': {'cross': 'Cruz · saltar / trepar', 'circle': 'Círculo · agacharse / deslizarse',
+                    'square': 'Cuadrado · recargar / recoger arma', 'triangle': 'Triángulo · cambiar de arma',
+                    'l1': 'L1 · orden al OWL', 'r1': 'R1 · granada', 'l2': 'L2 · apuntar', 'r2': 'R2 · disparar',
+                    'l3': 'L3 · correr', 'r3': 'R3 · cuerpo a cuerpo', 'options': 'Options · pausa', 'touchpad_left': 'Touchpad · clic izquierdo',
                     'touchpad_right': 'Touchpad · clic derecho', 'up': 'Arriba', 'down': 'Abajo',
-                    'left': 'Izquierda', 'right': 'Derecha'},
+                    'left': 'Izquierda', 'right': 'Derecha',
+                    'move_forward': 'Avanzar', 'move_back': 'Retroceder', 'move_left': 'Izquierda',
+                    'move_right': 'Derecha', 'swipe_up': 'Deslizar arriba', 'swipe_down': 'Deslizar abajo',
+                    'swipe_left': 'Deslizar a la izquierda', 'swipe_right': 'Deslizar a la derecha'},
     },
     'en': {
         'nav_home': 'Home', 'sec_display': 'Display', 'sec_upscaling': 'Upscaling',
         'sec_upscaling_sub': 'FSR, DLSS and quality modes', 'sec_image': 'Image quality',
         'sec_effects': 'Effects', 'sec_shaders': 'Shaders', 'sec_perf': 'Performance',
-        'sec_launcher': 'Launcher', 'sec_maint': 'Maintenance', 'sec_player': 'Player',
+        'sec_launcher': 'Launcher', 'sec_maint': 'Maintenance', 'sec_player': 'Player', 'sec_game': 'Game',
         'sec_mouse': 'Mouse', 'sec_prompts': 'Interface', 'sec_pad': 'Controller',
         'sec_pad_extra': 'Controller settings',
         'sub_kbm': 'Keyboard and mouse', 'sub_pad': 'Controller',
         'grp_face': 'Buttons', 'grp_shoulders': 'Triggers and sticks', 'grp_menu': 'Menu and touchpad',
-        'grp_dpad': 'D-pad',
+        'grp_dpad': 'D-pad · adrenaline, tactical echo, fire mode',
+        'grp_move': 'Movement (left stick)', 'grp_swipe': 'Touchpad swipes · OWL commands',
         'more': 'More', 'less': 'Less', 'cancel': 'Cancel', 'ok': 'OK', 'yes': 'Yes',
         'open_logs_q': 'Open logs', 'close': 'Close', 'game_status': 'Status',
         'home_sub': 'Native Windows port', 'quick_links': 'Shortcuts',
@@ -67,11 +75,15 @@ WEB_TEXTS = {
         'support': 'Support the port', 'theme': 'Theme',
         'cache_label': 'Shader cache', 'all_options': 'All options',
         'all_options_help': 'Graphics, advanced and controls go back to their defaults.',
-        'buttons': {'cross': 'Cross', 'circle': 'Circle', 'square': 'Square', 'triangle': 'Triangle',
-                    'l1': 'L1', 'r1': 'R1', 'l2': 'L2 · aim', 'r2': 'R2 · fire', 'l3': 'L3 · left stick',
-                    'r3': 'R3 · right stick', 'options': 'Options', 'touchpad_left': 'Touchpad · left click',
+        'buttons': {'cross': 'Cross · jump / vault', 'circle': 'Circle · crouch / slide',
+                    'square': 'Square · reload / pick up weapon', 'triangle': 'Triangle · switch weapon',
+                    'l1': 'L1 · OWL command', 'r1': 'R1 · grenade', 'l2': 'L2 · aim', 'r2': 'R2 · fire',
+                    'l3': 'L3 · sprint', 'r3': 'R3 · melee', 'options': 'Options · pause', 'touchpad_left': 'Touchpad · left click',
                     'touchpad_right': 'Touchpad · right click', 'up': 'Up', 'down': 'Down',
-                    'left': 'Left', 'right': 'Right'},
+                    'left': 'Left', 'right': 'Right',
+                    'move_forward': 'Forward', 'move_back': 'Back', 'move_left': 'Left', 'move_right': 'Right',
+                    'swipe_up': 'Swipe up', 'swipe_down': 'Swipe down', 'swipe_left': 'Swipe left',
+                    'swipe_right': 'Swipe right'},
     },
 }
 # Places the Tk window's texts name that are elsewhere here.
@@ -86,7 +98,9 @@ THEMES = {'vektan': '#0b0f13', 'helghast': '#070606'}
 BUTTON_GROUPS = (('grp_face', ('cross', 'circle', 'square', 'triangle')),
                  ('grp_shoulders', ('l1', 'r1', 'l2', 'r2', 'l3', 'r3')),
                  ('grp_menu', ('options', 'touchpad_left', 'touchpad_right')),
-                 ('grp_dpad', ('up', 'down', 'left', 'right')))
+                 ('grp_dpad', ('up', 'down', 'left', 'right')),
+                 ('grp_move', ('move_forward', 'move_back', 'move_left', 'move_right')),
+                 ('grp_swipe', ('swipe_up', 'swipe_down', 'swipe_left', 'swipe_right')))
 
 
 def available():
@@ -106,6 +120,7 @@ class Api:
         self._core = core
         self._window = None
         self._settings = core.load_launcher()
+        self._shown = threading.Event()
         self._graphics = core.load_graphics()
         self._process = None
         self._run_dir = None
@@ -191,7 +206,9 @@ class Api:
         defaults = {name: (key, pad) for name, _, key, pad in c.BUTTONS}
         groups = [{'title': t(title), 'buttons': [
             {'name': n, 'label': buttons[n], 'key': defaults[n][0], 'pad': defaults[n][1],
-             'fixed_pad': {'l2': 'LT / L2', 'r2': 'RT / R2'}.get(n)} for n in names]}
+             'fixed_pad': {'l2': 'LT / L2', 'r2': 'RT / R2',
+                           **{m: 'L stick' for m in ('move_forward', 'move_back', 'move_left', 'move_right')}}.get(n)}
+             for n in names]}
             for title, names in BUTTON_GROUPS]
         controls = {'id': 'controls', 'icon': 'gamepad', 'title': t('tab_controls'), 'tabs': [
             {'id': 'kbm', 'title': t('sub_kbm'), 'sections': [
@@ -215,6 +232,7 @@ class Api:
                     {'type': 'help', 'help': t('pad_extra_help')},
                     toggle('quick_menu', 'quick_menu'),
                     toggle('quick_menu_hint', 'quick_menu_hint'),
+                    select('menu_combo', 'menu_combo', [0, 1, 2, 3], t('menu_combos')),
                     {'type': 'help', 'help': t('quick_menu_help')},
                 ]},
             ]},
@@ -230,8 +248,13 @@ class Api:
             ]},
         ]}
 
+        languages = c.game_languages(self._settings['game_dir'], self._settings['update_dir'])
+        game_section = {'title': t('sec_game'), 'items': [
+            select('game_language', 'game_language', ['auto'] + [l[0] for l in languages],
+                   [t('game_language_auto')] + [l[2] for l in languages], 'game_language_help')]}
         advanced = {'id': 'advanced', 'icon': 'sliders', 'title': t('tab_advanced'), 'warning': t('advanced_help'),
                     'sections': [
+            game_section,
             {'title': t('sec_shaders'), 'items': [
                 toggle('precompile', 'precompile', 'precompile_help'),
                 toggle('async_shaders', 'async_shaders', 'async_help'),
@@ -240,6 +263,7 @@ class Api:
             {'title': t('sec_perf'), 'help': t('perf_help'), 'items': [
                 toggle('draw_pipe', 'draw_pipe'),
                 toggle('nowait_writes', 'nowait_writes'),
+                toggle('fast_locks', 'fast_locks'),
                 toggle('stale_readback', 'stale_readback', 'stale_help'),
                 toggle('deferred_readback', 'deferred_readback', 'deferred_help'),
                 select('frames_queued', 'frames_queued', c.FRAMES_QUEUED,
@@ -249,6 +273,12 @@ class Api:
                 toggle('check_updates', 'check_updates',
                        action={'id': 'check_updates_now', 'label': t('check_updates_now')}),
                 toggle('discord_rpc', 'discord_rpc', 'discord_rpc_help'),
+                {'type': 'button', 'label': t('reshade'), 'id': 'open_bin', 'button': t('open_bin'), 'icon': 'folder',
+                 'help': t('reshade_help') + ' ' + t('reshade_found' if any(
+                     (c.PORT_DIR / 'bin' / n).is_file() for n in ('ReShade.ini', 'ReShade64.dll', 'dxgi.dll'))
+                     else 'reshade_missing')},
+                {'type': 'button', 'label': t('shortcut'), 'help': t('shortcut_help'),
+                 'button': t('shortcut_create'), 'id': 'create_shortcut', 'icon': 'home'},
             ]},
             {'title': t('sec_maint'), 'items': [
                 {'type': 'cache', 'label': t('cache_label'), 'button': t('clear_cache')},
@@ -275,9 +305,9 @@ class Api:
         s = self._settings
         values = dict(self._graphics)
         for key in ('window_size', 'mouse_look', 'mouse_sens', 'mouse_invert', 'mouse_turn_boost', 'smart_pending',
-                    'precompile', 'draw_pipe', 'nowait_writes', 'res_method', 'discord_rpc', 'pad_dead_zone',
+                    'precompile', 'draw_pipe', 'nowait_writes', 'fast_locks', 'res_method', 'discord_rpc', 'pad_dead_zone',
                     'pad_speaker', 'quick_menu', 'quick_menu_hint', 'prompt_style', 'upscale_quality',
-                    'check_updates'):
+                    'check_updates', 'game_language', 'menu_combo'):
             values[key] = s.get(key, c.LAUNCHER_DEFAULTS.get(key))
         values['window_size'] = s.get('window_size') if s.get('window_size') in c.WINDOW_SIZES else '1920x1080'
         values['ultrawide'] = s.get('ultrawide') if s.get('ultrawide') in c.ULTRAWIDE else 'off'
@@ -286,6 +316,8 @@ class Api:
         if values['upscale_quality'] not in c.UPSCALE_QUALITIES:
             values['upscale_quality'] = 'native'
         values['launcher_theme'] = s.get('launcher_theme') if s.get('launcher_theme') in THEMES else 'vektan'
+        if values['game_language'] not in [l[0] for l in c.game_languages(s['game_dir'], s['update_dir'])]:
+            values['game_language'] = 'auto'
         values['fov'] = c.fov_percent(s.get('fov'))
         values['mouse_turn_boost'] = c.turn_boost(s.get('mouse_turn_boost'))
         return values
@@ -351,7 +383,7 @@ class Api:
             value = c.turn_boost(value)
         elif key == 'mouse_sens':
             value = max(0.2, min(4.0, round(float(value) * 10) / 10))
-        elif key in ('pad_dead_zone', 'pad_speaker', 'prompt_style'):
+        elif key in ('pad_dead_zone', 'pad_speaker', 'prompt_style', 'menu_combo'):
             value = int(value)
         elif not isinstance(value, bool):
             value = str(value)
@@ -392,7 +424,7 @@ class Api:
         c.save_graphics(self._graphics)
         self._settings.update(window_size='1920x1080', key_map={}, pad_map={}, mouse_look=True, mouse_sens=1.0,
                               mouse_invert=False, mouse_turn_boost=6, smart_pending=True, precompile=True,
-                              draw_pipe=True, nowait_writes=True, res_method='upscale', frame_gen='off',
+                              draw_pipe=True, nowait_writes=True, fast_locks=True, res_method='upscale', frame_gen='off',
                               ultrawide='off', discord_rpc=True, pad_dead_zone=0, pad_speaker=100, fov=100,
                               quick_menu=True, quick_menu_hint=True)
         c.save_launcher(self._settings)
@@ -438,6 +470,19 @@ class Api:
                 'run_logs': self._run_dir or c.LOGS_DIR}.get(name)
         if path:
             c.open_folder(path)
+
+    def open_bin(self):
+        folder = self._core.PORT_DIR / 'bin'
+        if folder.is_dir():
+            os.startfile(folder)
+
+    def create_shortcut(self):
+        c = self._core
+        try:
+            c.create_play_shortcut()
+        except (OSError, subprocess.SubprocessError) as error:
+            return {'error': c.tr('shortcut_failed', error=error)}
+        return {'text': c.tr('shortcut_done')}
 
     def open_url(self, name):
         c = self._core
@@ -543,6 +588,9 @@ class Api:
                 self._emit('message', {'text': c.tr('update_failed', error=e), 'level': 'error'})
                 return
             self._window.destroy()
+            # The script copies the files once this process is gone: a thread left running kept it
+            # alive with no window, so the update never applied (#87).
+            c.kzsf_update.exit_for_update()
         threading.Thread(target=work, daemon=True).start()
 
     # -- playing ------------------------------------------------------------------------------
@@ -597,6 +645,10 @@ class Api:
     def ready(self):
         """The page has drawn itself: background work that answers with events."""
         c = self._core
+        self._shown.set()
+        if self._settings.pop('launcher_gpu_off_pending', None):
+            # The software-drawn window worked: keep it that way (the GPU one stayed black, #82).
+            c.save_launcher(self._settings)
         self.cache_size()
         if self._settings.get('check_updates', True):
             self.check_updates(quiet=True)
@@ -633,6 +685,10 @@ def run(core):
     if not available():
         return False
     import webview
+    launcher = core.load_launcher()
+    # Without GPU drawing: WebView2 showed only a black window on some PCs (#82).
+    if launcher.get('launcher_gpu') is False or os.environ.get('KZSF_WEB_GPU') == '0':
+        os.environ.setdefault('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', '--disable-gpu')
     api = Api(core)
     scale = 1.0
     try:
@@ -647,9 +703,23 @@ def run(core):
     api._window = window
     window.events.shown += lambda: dark_title_bar(window)
     icon = core.PORT_DIR / 'launcher' / 'kzsf.ico'
+    blank, closed = threading.Event(), threading.Event()
+    window.events.closed += closed.set
+
+    def watchdog():
+        # A page that never drew itself: next time without the GPU, this time the classic window.
+        if (not api._shown.wait(25) and not closed.is_set() and
+                launcher.get('launcher_gpu') is not False):
+            blank.set()
+            settings = core.load_launcher()
+            settings['launcher_gpu'] = False
+            settings['launcher_gpu_off_pending'] = True
+            core.save_launcher(settings)
+            window.destroy()
+    threading.Thread(target=watchdog, daemon=True).start()
     webview.start(gui='edgechromium', debug=bool(os.environ.get('KZSF_WEB_DEBUG')),
                   private_mode=True, icon=str(icon) if icon.is_file() else None)
-    return True
+    return not blank.is_set()
 
 
 def preview(path):

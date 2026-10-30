@@ -632,7 +632,11 @@ static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandB
     scheduler.DeferPriorityOperation([allocator = instance.GetAllocator(), buffer, allocation, info,
                                       size = buffer_ci.size, file = std::string{path}] {
         vmaInvalidateAllocation(allocator, allocation, 0, VK_WHOLE_SIZE);
+        // The folder may not exist yet (a release has no out/dump: #24 got no dumps).
+        std::error_code error;
+        std::filesystem::create_directories(std::filesystem::path{file}.parent_path(), error);
         if (FILE* f = std::fopen(file.c_str(), "wb")) {
+            std::printf("Frame dump: %s\n", file.c_str());
             std::fwrite(info.pMappedData, 1, size, f);
             std::fclose(f);
         }

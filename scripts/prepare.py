@@ -24,11 +24,48 @@ def unpack(fmt, data, offset):
     return struct.unpack(fmt, span(data, offset, struct.calcsize(fmt)))
 
 
-def parse_self(data):
+def parse_self(data, name=None):
+    """parse_self_data, with the file's name in its errors (issue #60: a truncated module was
+    only reported as "out of bounds")."""
+    try:
+        return parse_self_data(data)
+    except (ValueError, struct.error) as error:
+        if not name:
+            raise
+        raise ValueError(f'{name}: {error} (the file is damaged or incomplete: copy the game again)') from error
+
+
+def parse_plain_elf(data):
+    """An eboot.bin / .prx some dumpers write already decrypted, as a plain ELF (issue #33)."""
+    header = unpack('<16sHHIQQQIHHHHHH', data, 0)
+    if header[0][:7] != b'\x7fELF\x02\x01\x01' or header[2] != 62:
+        raise ValueError("expected little-endian x86-64 ELF")
+    if header[9] != 56 or not 0 < header[10] < 256:
+        raise ValueError("unsupported program headers")
+    ph = [dict(zip(('type', 'flags', 'offset', 'vaddr', 'paddr', 'filesz', 'memsz', 'align'),
+                   unpack('<IIQQQQQQ', data, header[5] + i * 56)))
+          for i in range(header[10])]
+    end = max(p['offset'] + p['filesz'] for p in ph)
+    if end > 512 * 1024 * 1024:
+        raise ValueError("probe image exceeds 512 MiB limit")
+    missing = []
+    for i, p in enumerate(ph):
+        if p['filesz'] and p['offset'] + p['filesz'] > len(data):
+            missing.append(i)
+            if p['type'] in (1, 2, 0x61000000, 0x61000010):
+                raise ValueError(f"required segment {i} is unavailable")
+    elf = bytearray(end)
+    elf[:min(end, len(data))] = data[:end]
+    return elf, header, ph, [], missing
+
+
+def parse_self_data(data):
     if not data:  # read_self names the file; this covers every other way in
         raise ValueError('empty SELF (0 bytes)')
+    if span(data, 0, 4) == b'\x7fELF':
+        return parse_plain_elf(data)
     if span(data, 0, 4) != b'O\x15=\x1d':
-        raise ValueError("expected PS4 SELF")
+        raise ValueError("expected PS4 SELF (or a decrypted ELF)")
     count, = unpack('<H', data, 24)
     base = 32 + count * 32
     header = unpack('<16sHHIQQQIHHHHHH', data, base)
@@ -131,7 +168,7 @@ def nid(name):
 def inspect_libc(path):
     """Prove that this dump's _init_env is exactly RET; never assume it."""
     source = read_self(path)
-    elf, header, ph, _, missing = parse_self(source)
+    elf, header, ph, _, missing = parse_self(source, Path(path).name)
     dynamic = next(p for p in ph if p['type'] == 2)
     tags = dict(unpack('<QQ', elf, pos) for pos in
                 range(dynamic['offset'], dynamic['offset'] + dynamic['filesz'], 16))
@@ -162,7 +199,7 @@ def inspect_libc(path):
 
 def prepare(game, out):
     source = read_self(game / 'eboot.bin')
-    elf, header, ph, segments, missing = parse_self(source)
+    elf, header, ph, segments, missing = parse_self(source, 'eboot.bin')
     loads = [p for p in ph if p['type'] in (1, 0x61000010)]
     def mapped(addr, size=8):
         return any(p['vaddr'] <= addr and addr + size <= p['vaddr'] + p['memsz'] for p in loads)

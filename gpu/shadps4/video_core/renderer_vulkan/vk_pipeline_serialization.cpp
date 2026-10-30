@@ -261,13 +261,14 @@ void ReportPipelineBinaryCache() {
     const auto hits = binary_hits.load();
     const auto misses = binary_misses.load();
     std::printf("Pipeline binary cache: %llu hits, %llu compiled, %llu rejected, %llu saved, "
-                "%llu cache errors (restore %.3f ms, compile %.3f ms each)\n",
+                "%llu cache errors (restore %.3f ms, compile %.3f ms, file read %.3f ms each)\n",
                 static_cast<unsigned long long>(hits), static_cast<unsigned long long>(misses),
                 static_cast<unsigned long long>(binary_rejected.load()),
                 static_cast<unsigned long long>(binary_saved.load()),
                 static_cast<unsigned long long>(binary_errors.load()),
                 binary_restore_ns.load() / 1e6 / std::max(u64{1}, binary_restore_calls.load()),
-                binary_compile_ns.load() / 1e6 / std::max(u64{1}, binary_compile_calls.load()));
+                binary_compile_ns.load() / 1e6 / std::max(u64{1}, binary_compile_calls.load()),
+                binary_load_ns.load() / 1e6 / std::max(u64{1}, hits + misses));
 }
 
 vk::ResultValue<vk::UniquePipeline> CreateCachedGraphicsPipeline(
@@ -975,6 +976,10 @@ void PipelineCache::WarmUp(const std::function<void(u32, u32, const char*)>& pro
     if (!CheckCacheProfile()) {
         return;
     }
+    Storage::DataBase::Instance().StartPrefetch();
+    SCOPE_EXIT {
+        Storage::DataBase::Instance().StopPrefetch();
+    };
 
     u32 num_pipelines{};
     u32 num_total_pipelines{};

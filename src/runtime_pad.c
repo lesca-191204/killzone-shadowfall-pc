@@ -2,10 +2,11 @@
  * by the window thread (gpu/shim/window.cpp); here state is only sampled.
  *
  * Default keyboard layout (GOW3_KEY_MAP changes the buttons, see apply_button_map):
- *   WASD left stick, mouse camera (left button R2, right button L2), Space Cross, C Circle,
+ *   WASD left stick (move_*), mouse camera (left button R2, right button L2), Space Cross, C Circle,
  *   R Square, Q Triangle, 1 L1, 3 R1, LShift L3 (sprint), F R3, arrow keys d-pad,
  *   Enter Options, Tab left touchpad (photo mode), Backspace right touchpad (pause menu),
- *   Delete held + mouse = finger on the touchpad (the OWL's commands). */
+ *   Delete held + mouse = finger on the touchpad (the OWL's commands; swipe_* map a key or a
+ *   button to one swipe). */
 #define _GNU_SOURCE
 #include "runtime.h"
 #include "gpu/gow3gpu.h"
@@ -30,6 +31,12 @@ enum {
     /* Host-only sources, never shown to the game: a click on one side of the touchpad from a
      * button or key without a touch surface (play_click turns them into a touch and a click). */
     CLICK_LEFT=0x40000000, CLICK_RIGHT=0x80000000,
+    /* Host-only too: the left stick's keys (move_*, WASD by default, issues #83/#89) and swipes
+     * on the touchpad from a key or button (swipe_*, the OWL's commands, issue #92). */
+    MOVE_FORWARD=0x00200000, MOVE_BACK=0x00400000, MOVE_LEFT=0x00800000, MOVE_RIGHT=0x01000000,
+    MOVE_MASK=MOVE_FORWARD|MOVE_BACK|MOVE_LEFT|MOVE_RIGHT,
+    SWIPE_UP=0x02000000, SWIPE_DOWN=0x04000000, SWIPE_LEFT=0x08000000, SWIPE_RIGHT=0x10000000,
+    SWIPE_MASK=SWIPE_UP|SWIPE_DOWN|SWIPE_LEFT|SWIPE_RIGHT,
 };
 typedef struct { uint16_t x, y; uint8_t id, reserve[3]; } PadTouch;
 typedef struct {
@@ -103,6 +110,30 @@ static void play_click(PadData *d) {
     if (now>=down && now<up) d->buttons|=BTN_TOUCHPAD;
 }
 
+/* A swipe source pressed plays one swipe across the touchpad, SWIPE_US long; holding it does not
+ * repeat it. */
+enum { SWIPE_US=200000 };
+static struct { int dir; uint64_t start; uint32_t held; } swipe={-1,0,0};
+static void play_swipe(PadData *d) {
+    const uint32_t sources=d->buttons & SWIPE_MASK;
+    d->buttons&=~SWIPE_MASK;
+    const uint32_t pressed=sources & ~swipe.held;
+    swipe.held=sources;
+    if (pressed && swipe.dir<0) {
+        swipe.dir=(pressed & SWIPE_UP) ? 0 : (pressed & SWIPE_DOWN) ? 1 : (pressed & SWIPE_LEFT) ? 2 : 3;
+        swipe.start=d->timestamp;
+    }
+    if (swipe.dir<0) return;
+    const uint64_t t=d->timestamp-swipe.start;
+    if (t>=SWIPE_US) { swipe.dir=-1; return; }
+    if (d->touch_count>=2) return;
+    static const int dx[4]={0,0,-1,1}, dy[4]={-1,1,0,0};
+    const float f=(float)t/SWIPE_US-0.5f;
+    d->touches[d->touch_count]=(PadTouch){.x=(uint16_t)(960+dx[swipe.dir]*f*900.0f),
+        .y=(uint16_t)(471+dy[swipe.dir]*f*600.0f),.id=(uint8_t)(0x60+d->touch_count)};
+    ++d->touch_count;
+}
+
 /* Opens the first gamepad SDL knows about; called under lock. */
 static SDL_Gamepad *current_gamepad(void) {
     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
@@ -132,6 +163,8 @@ static const struct { const char *name; uint32_t ps; } ps_names[]={
     {"l1",BTN_L1}, {"r1",BTN_R1}, {"l2",BTN_L2}, {"r2",BTN_R2}, {"l3",BTN_L3}, {"r3",BTN_R3},
     {"options",BTN_OPTIONS}, {"touchpad",CLICK_LEFT}, {"touchpad_left",CLICK_LEFT}, {"touchpad_right",CLICK_RIGHT},
     {"up",BTN_UP}, {"down",BTN_DOWN}, {"left",BTN_LEFT}, {"right",BTN_RIGHT},
+    {"move_forward",MOVE_FORWARD}, {"move_back",MOVE_BACK}, {"move_left",MOVE_LEFT}, {"move_right",MOVE_RIGHT},
+    {"swipe_up",SWIPE_UP}, {"swipe_down",SWIPE_DOWN}, {"swipe_left",SWIPE_LEFT}, {"swipe_right",SWIPE_RIGHT},
 };
 typedef struct { int source; uint32_t ps; } ButtonSource;
 typedef struct { ButtonSource entries[48]; size_t count; } ButtonMap;
@@ -151,7 +184,8 @@ static ButtonMap key_map={{
     {SDL_SCANCODE_LSHIFT,BTN_L3}, {SDL_SCANCODE_F,BTN_R3},
     {SDL_SCANCODE_RETURN,BTN_OPTIONS}, {SDL_SCANCODE_TAB,CLICK_LEFT}, {SDL_SCANCODE_BACKSPACE,CLICK_RIGHT},
     {SDL_SCANCODE_UP,BTN_UP}, {SDL_SCANCODE_DOWN,BTN_DOWN}, {SDL_SCANCODE_LEFT,BTN_LEFT}, {SDL_SCANCODE_RIGHT,BTN_RIGHT},
-},17};
+    {SDL_SCANCODE_W,MOVE_FORWARD}, {SDL_SCANCODE_S,MOVE_BACK}, {SDL_SCANCODE_A,MOVE_LEFT}, {SDL_SCANCODE_D,MOVE_RIGHT},
+},19};
 
 static char *trim(char *text) {
     while (*text==' ' || *text=='\t') ++text;
@@ -310,6 +344,13 @@ static int apply_button_map(ButtonMap *map, const char *spec, bool keyboard) {
         uint32_t ps=0;
         for (size_t i=0;i<sizeof(ps_names)/sizeof(*ps_names);++i) if (!SDL_strcasecmp(button,ps_names[i].name)) ps=ps_names[i].ps;
         const int source=!*name ? -1 : keyboard ? key_source(name) : (int)SDL_GetGamepadButtonFromString(name);
+        if (ps && !*name) { /* "button=": no source at all (its key went to another button) */
+            size_t kept=0;
+            for (size_t i=0;i<map->count;++i) if (map->entries[i].ps!=ps) map->entries[kept++]=map->entries[i];
+            map->count=kept;
+            ++used;
+            continue;
+        }
         if (!ps || source<=(keyboard ? (int)SDL_SCANCODE_UNKNOWN : (int)SDL_GAMEPAD_BUTTON_INVALID)) {
             printf("Runtime: pad map: ignored '%s=%s'\n",button,name);
             continue;
@@ -558,8 +599,7 @@ static void sample_host(PadData *d) {
     const int captured=mouse_cfg.look && gow3gpu_mouse_sample(&mdx,&mdy,&mbuttons,&wheel);
     if (wheel>0) wheel_until_us[0]=now+60000;
     if (wheel<0) wheel_until_us[1]=now+60000;
-    int host_used=mdx!=0.0f || mdy!=0.0f || k[SDL_SCANCODE_W] || k[SDL_SCANCODE_A] || k[SDL_SCANCODE_S] ||
-                  k[SDL_SCANCODE_D];
+    int host_used=mdx!=0.0f || mdy!=0.0f;
     for (size_t i=0;i<key_map.count;++i)
         if (source_down(key_map.entries[i].source,k,captured ? mbuttons : 0,now)) {
             d->buttons|=key_map.entries[i].ps;
@@ -596,8 +636,6 @@ static void sample_host(PadData *d) {
     mouse_last_us=now;
     if (d->buttons & BTN_L2) d->l2=255;
     if (d->buttons & BTN_R2) d->r2=255;
-    key_axis(&d->left_x,k[SDL_SCANCODE_A],k[SDL_SCANCODE_D]);
-    key_axis(&d->left_y,k[SDL_SCANCODE_W],k[SDL_SCANCODE_S]);
 }
 
 void runtime_pad_free_camera(int active) { __atomic_store_n(&free_camera,active!=0,__ATOMIC_RELAXED); }
@@ -780,6 +818,12 @@ static void sample(PadData *d) {
     if (injected.buttons & BTN_R2) d->r2=255;
     uint8_t *axes[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
     for (int i=0;i<4;++i) if (injected.stick[i]>=0) *axes[i]=(uint8_t)injected.stick[i];
+    /* The movement sources (keys, or pad buttons mapped to them) drive the left stick. */
+    const uint32_t move=d->buttons & MOVE_MASK;
+    d->buttons&=~MOVE_MASK;
+    key_axis(&d->left_x,move & MOVE_LEFT,move & MOVE_RIGHT);
+    key_axis(&d->left_y,move & MOVE_FORWARD,move & MOVE_BACK);
+    play_swipe(d);
     play_click(d);
     if (hold_after_capture) {
         if (d->buttons) d->buttons=0;

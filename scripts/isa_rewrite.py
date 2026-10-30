@@ -4,7 +4,7 @@ scan_segment decodes one executable segment with iced-x86 and classifies each
 site: JMP (5+ bytes, patched with a jump to a stub), JMP_RELOCATE (4 bytes,
 the jump also covers the plain next instruction, copied into the stub), INT3
 (4 bytes, trapped at run time) or UNSUPPORTED (an encoding the stubs do not
-emulate: segment override, LOCK, 32-bit addressing or F16C).
+emulate: segment override, LOCK, 32-bit addressing, F16C other than vcvtph2ps between registers).
 
 Usage: isa_rewrite.py out/boot-linked.bin --out out
 Reads the G3PROBE5 image, scans its executable segments and writes
@@ -78,11 +78,14 @@ def site_of(ins, kind, original):
             width = width or RegisterExt.size(ins.op_register(i)) * 8
         elif ins.op_kind(i) == OpKind.MEMORY:
             mem_slot = 1 if i == 0 else 2
-    if SET_OF_KIND[kind] == 'F16C':
-        width = 0
+    # F16C: only vcvtph2ps between registers has a stub (issue #7); width 1 marks a ymm destination.
+    f16c = SET_OF_KIND[kind] == 'F16C'
+    if f16c:
+        width = int(RegisterExt.is_ymm(ins.op_register(0))) if ins.op0_kind == OpKind.REGISTER else 0
     base = index = NO_REG
     scale = mem_flags = disp = 0
-    unsupported = SET_OF_KIND[kind] == 'F16C' or ins.segment_prefix != Register.NONE or ins.has_lock_prefix
+    unsupported = ((f16c and (kind != KIND_VCVTPH2PS or mem_slot or ins.len < 5))
+                   or ins.segment_prefix != Register.NONE or ins.has_lock_prefix)
     if mem_slot:
         unsupported |= any(r != Register.NONE and RegisterExt.size(r) != 8 for r in (ins.memory_base, ins.memory_index))
         scale = ins.memory_index_scale

@@ -5,11 +5,20 @@ neither dump is modified. Whatever the update does not touch is linked as a whol
 or a junction / hard link on Windows without the symlink privilege, see mods.make_link), so
 a 47 GB game costs a handful of links. Names are matched without regard to case.
 """
+import os
 from pathlib import Path
 import shutil
 import tempfile
 
-from mods import is_link, make_link, remove_link
+from mods import is_link, remove_link
+from mods import make_link as link_to
+
+
+def make_link(link, target):
+    """mods.make_link with the target in its plain form: the view's own paths may carry the
+    \\\\?\\ prefix (long_path), which a junction's target cannot."""
+    text = str(target)
+    link_to(link, Path(text[4:]) if text.startswith('\\\\?\\') else target)
 
 
 def overlay(source, dest):
@@ -47,6 +56,16 @@ def remove(path):
         path.unlink()
 
 
+def long_path(path):
+    """path in the \\\\?\\ form on Windows: Decima's lump names are ~130 characters, so a view
+    inside a deep port folder passes MAX_PATH, which plain paths only allow with the
+    LongPathsEnabled policy. Network (\\\\server) and already prefixed paths stay as they are."""
+    text = os.path.abspath(str(path))
+    if os.name != 'nt' or text.startswith('\\\\'):
+        return Path(text)
+    return Path('\\\\?\\' + text)
+
+
 def create_view(base, update, out):
     """The folder holding base with update over it, made in out; the caller removes it."""
     from patches import game_title_id
@@ -59,11 +78,12 @@ def create_view(base, update, out):
     if not (update / 'eboot.bin').is_file():
         raise ValueError('The update folder needs eboot.bin and sce_sys/param.sfo')
     Path(out).mkdir(parents=True, exist_ok=True)
-    target = Path(tempfile.mkdtemp(prefix='game-update-', dir=out))
+    target = Path(tempfile.mkdtemp(prefix='gu-', dir=out))
+    view = long_path(target)
     try:
-        for entry in base.iterdir():
-            make_link(target / entry.name, entry)
-        overlay(update, target)
+        for entry in long_path(base).iterdir():
+            make_link(view / entry.name, entry)
+        overlay(long_path(update), view)
     except BaseException:
         remove_view(target)
         raise
@@ -72,5 +92,6 @@ def create_view(base, update, out):
 
 def remove_view(path):
     """Deletes a view made by create_view (the dumps stay untouched)."""
-    if Path(path).exists():
+    path = long_path(path)
+    if path.exists():
         remove(path)

@@ -661,9 +661,19 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
     // until its slot; slots advance by one period (no drift) but never lag behind by more.
     // gow3: the in-game menu changes the limit live (Gow3Settings::fps_limit); GOW3_FPS_LIMIT
     // and the uncapped presets keep their fixed limit.
-    const bool fixed_limit = std::getenv("GOW3_FPS_LIMIT") || EmulatorSettings.GetVblankFrequency() == 480;
+    // gow3: an uncapped session (vblank 480: the launcher's 144 / 240 / unlimited) follows the
+    // menu's limit live as well, without the engine ceiling (Killzone times its frames with the
+    // guest TSC). It used to keep its startup limit: 60 in the menu stayed unlimited.
+    const bool uncapped = EmulatorSettings.GetVblankFrequency() == 480;
+    const bool fixed_limit = std::getenv("GOW3_FPS_LIMIT") && !uncapped;
+    const int startup_menu_limit = Gow3Settings::Get().fps_limit;
     const auto current_limit = [&] {
         const auto& s = Gow3Settings::Get();
+        if (uncapped) {
+            const int limit = s.fps_limit;
+            return limit == startup_menu_limit ? EmulatorSettings.GetFrameLimit()
+                                               : u32(std::max(limit, 0));
+        }
         return fixed_limit ? EmulatorSettings.GetFrameLimit()
                            : u32(Gow3Graphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
     };
@@ -768,7 +778,7 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
                 if (next_flip >= tick_deadline) {
                     break;
                 }
-                std::this_thread::sleep_until(next_flip);
+                Common::PreciseSleepUntil(next_flip); // gow3: even frame-limited flips (#66)
             }
             const auto now = std::chrono::steady_clock::now();
             const auto request = receive_request();
@@ -778,7 +788,11 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
                 FRAME_END;
             }
         }
-        std::this_thread::sleep_until(tick_deadline);
+        // gow3: the high-resolution timer sleep (std::this_thread waits for the system tick).
+        if (const auto left = tick_deadline - std::chrono::steady_clock::now(); left.count() > 0) {
+            Common::AccurateSleep(std::chrono::duration_cast<std::chrono::nanoseconds>(left), nullptr,
+                                  false);
+        }
     }
 }
 

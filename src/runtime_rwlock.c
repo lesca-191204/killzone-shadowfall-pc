@@ -23,15 +23,16 @@ typedef struct { int64_t seconds, nanoseconds; } GuestTime;
 static pthread_mutex_t registry_lock = PTHREAD_MUTEX_INITIALIZER;
 static Rwlock *registry;
 static size_t created, reads, writes, unlocks;
-/* Experimental backend is opt-in; stock paths below remain available for A/B. */
+/* Sharded backend is the default since v0.7.0 (2026-10-29 A/B: ~38% more draws/s, ~40% fewer
+ * frames over 40 ms); GOW3_RWLOCK_FAST=0 selects the stock paths below. */
 uintptr_t runtime_rwlock_fast_resolve(const char *name);
 void runtime_rwlock_fast_report(void);
 static pthread_once_t backend_once=PTHREAD_ONCE_INIT;
 static int fast_backend;
 static void select_backend(void) {
     const char *setting=getenv("GOW3_RWLOCK_FAST");
-    fast_backend=setting && !strcmp(setting,"1");
-    printf("Runtime: rwlock backend %s (experimental A/B build)\n",
+    fast_backend=!setting || strcmp(setting,"0");
+    printf("Runtime: rwlock backend %s\n",
            fast_backend ? "sharded-256" : "stock");
 }
 static int32_t error(int e) {

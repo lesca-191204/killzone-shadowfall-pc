@@ -128,7 +128,7 @@ static ABI void guest_exit(void) { puts("Runtime: process finalizer callback rea
 /* Cheats (src/cheat_hook.h): the menu's switches (one byte each, gow3_cheat_flag) and guest
  * memory reads and writes that fail instead of faulting. */
 static volatile uint8_t *cheat_flags[GOW3_CHEAT_COUNT];
-static uint64_t echo_site=UINT64_MAX;
+static uint64_t echo_site=UINT64_MAX, damage_site=UINT64_MAX, effects_site=UINT64_MAX;
 static int cheat_on(unsigned id) { return cheat_flags[id] && *cheat_flags[id]; }
 static int cheat_read(uintptr_t address, void *out, size_t size) {
     SIZE_T got=0;
@@ -144,6 +144,23 @@ static int echo_trap(CONTEXT *c, const void *address) {
     if (cheat_on(GOW3_CHEAT_ECHO)) gow3_echo_continue(c->Rdi,(uintptr_t)image,cheat_read,cheat_write);
     c->R14=c->Rdi;
     c->Rip=(uintptr_t)image+echo_site+GOW3_ECHO_LENGTH;
+    return 1;
+}
+/* The god mode int3s: return at once (damage: for the player only), else replay "push rbp". */
+static int damage_trap(CONTEXT *c, const void *address) {
+    const int damage=damage_site!=UINT64_MAX && address==image+damage_site;
+    const uint64_t at=damage ? damage_site : effects_site;
+    if (!damage && (effects_site==UINT64_MAX || address!=image+effects_site)) return 0;
+    uintptr_t entity=0, resume=0;
+    if (cheat_on(GOW3_CHEAT_GOD) && cheat_read(c->Rsp,&resume,8) &&
+        (!damage || (cheat_read(c->Rdi+0x38,&entity,8) && gow3_player_entity(entity,(uintptr_t)image,cheat_read,0)))) {
+        c->Rip=resume;
+        c->Rsp+=8;
+        return 1;
+    }
+    c->Rsp-=8;
+    *(DWORD64 *)c->Rsp=c->Rbp;
+    c->Rip=(uintptr_t)image+at+1;
     return 1;
 }
 static void describe_address(char *out, size_t size, uintptr_t address) {
@@ -274,7 +291,8 @@ static void isa_context_regs(CONTEXT *c, IsaRegs *regs, int to_context) {
 static LONG CALLBACK vectored_fault(EXCEPTION_POINTERS *info) {
     const EXCEPTION_RECORD *record=info->ExceptionRecord;
     DWORD code=record->ExceptionCode;
-    if (code==EXCEPTION_BREAKPOINT && echo_trap(info->ContextRecord,record->ExceptionAddress))
+    if (code==EXCEPTION_BREAKPOINT && (echo_trap(info->ContextRecord,record->ExceptionAddress) ||
+                                       damage_trap(info->ContextRecord,record->ExceptionAddress)))
         return EXCEPTION_CONTINUE_EXECUTION;
     if (code==EXCEPTION_BREAKPOINT && isa_table) {
         /* An int3 ISA site: emulated here; any other breakpoint goes on to the report below. */
@@ -548,6 +566,22 @@ static void install_cheats(Segment *segments, uint64_t count, uint64_t size) {
         CloseHandle(CreateThread(NULL, 0, debug_cheats_thread, NULL, 0, NULL));
         printf("Cheats: game debug settings at image+0x%" PRIx64 " (god mode, ammo, reload, sprint, chapters; live)\n",
                slot);
+    }
+    const uint64_t hit = gow3_signature_find(image, size, &gow3_god_hit_site);
+    if (hit == UINT64_MAX || !mapped(segments, count, hit, 1)) {
+        printf("Cheats: god mode still shows hits (damage code not found in this eboot.bin)\n");
+    } else {
+        damage_site = hit;
+        image[hit] = 0xcc;
+        printf("Cheats: god mode skips the player's hits at image+0x%" PRIx64 "\n", hit);
+    }
+    const uint64_t effects = gow3_signature_find(image, size, &gow3_god_effects_site);
+    if (effects == UINT64_MAX || !mapped(segments, count, effects, 1)) {
+        printf("Cheats: god mode still shows hit effects (code not found in this eboot.bin)\n");
+    } else {
+        effects_site = effects;
+        image[effects] = 0xcc;
+        printf("Cheats: god mode skips the hit effects at image+0x%" PRIx64 "\n", effects);
     }
     const uint64_t at = gow3_signature_find(image, size, &gow3_echo_site);
     if (at == UINT64_MAX || !mapped(segments, count, at, GOW3_ECHO_LENGTH)) {
@@ -1035,9 +1069,17 @@ static uint64_t prompt_create(const uint32_t *pixels, unsigned width, unsigned h
  * atlas is prepared here, on the game's thread, before any of its icons is drawn. */
 static ABI void prompt_lookup(uintptr_t collection, uint64_t unused1, uint64_t unused2) {
     (void)unused1; (void)unused2;
-    if (!collection || *(const int32_t *)(collection + 0x18) != GOW3_PROMPT_GLYPHS) return;
+    if (!collection) return;
+    const int32_t glyphs = *(const int32_t *)(collection + 0x18);
+    if (glyphs <= 0 || glyphs > GOW3_PROMPT_GLYPHS) return;
     const uint64_t source = *(const uint64_t *)(collection + 0x50);
     if (!source) return;
+    /* Only a button atlas claims one of the few slots (any glyph count since #91). */
+    uint64_t vtable = 0;
+    uint32_t dims[2] = {0, 0};
+    if (!prompt_read(source, &vtable, 8) || vtable != (uintptr_t)image + GOW3_PROMPT_ATLAS_VTABLE ||
+        !prompt_read(source + 0x18, dims, sizeof(dims)) || dims[0] != GOW3_PROMPT_ATLAS_WIDTH ||
+        dims[1] != GOW3_PROMPT_ATLAS_HEIGHT) return;
     unsigned slot = GOW3_PROMPT_ATLASES;
     for (unsigned i = 0; i < GOW3_PROMPT_ATLASES; ++i) {
         uint64_t expected = 0;

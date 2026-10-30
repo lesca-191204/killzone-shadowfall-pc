@@ -19,8 +19,37 @@
 #include <windows.h>
 /* 64-bit sizes and times; directories are never opened as CRT descriptors. */
 typedef struct _stat64 HostStat;
-#define host_stat(path,s) _stat64(path,s)
 #define host_fstat(fd,s) _fstat64(fd,s)
+/* Paths past MAX_PATH (a long port folder + game_update's view + Decima's 130-character lump
+ * names) fail in the narrow CRT unless the LongPathsEnabled policy is on. Those go through the
+ * wide API as \\?\ absolute paths; shorter ones keep the narrow calls. */
+static int long_wide_path(const char *path,wchar_t *out,size_t count) {
+    if (strlen(path)<240) return 0;
+    wchar_t wide[2048],full[2048];
+    if (!MultiByteToWideChar(CP_ACP,0,path,-1,wide,2048)) return 0;
+    for (wchar_t *p=wide;*p;++p) if (*p==L'/') *p=L'\\';
+    if (!wcsncmp(wide,L"\\\\?\\",4)) {
+        if (wcslen(wide)>=count) return 0;
+        wcscpy(out,wide); return 1;
+    }
+    DWORD n=GetFullPathNameW(wide,2048,full,NULL);
+    if (!n || n>=2048 || n+8>=count) return 0;
+    if (!wcsncmp(full,L"\\\\",2)) swprintf(out,count,L"\\\\?\\UNC\\%ls",full+2);
+    else swprintf(out,count,L"\\\\?\\%ls",full);
+    return 1;
+}
+static int host_stat(const char *path,HostStat *s) {
+    wchar_t wide[2100];
+    return long_wide_path(path,wide,2100) ? _wstat64(wide,s) : _stat64(path,s);
+}
+static int host_open(const char *path,int flags,int mode) {
+    wchar_t wide[2100];
+    return long_wide_path(path,wide,2100) ? _wopen(wide,flags,mode) : open(path,flags,mode);
+}
+static DWORD host_attributes(const char *path) {
+    wchar_t wide[2100];
+    return long_wide_path(path,wide,2100) ? GetFileAttributesW(wide) : GetFileAttributesA(path);
+}
 #define host_lseek _lseeki64
 #define O_DIRECTORY 0x40000000 /* gow3 marker, removed before _open */
 #else
@@ -192,10 +221,10 @@ static void convert_stat(const HostStat *s,GuestStat *g) {
  * successful _stat64 result if the target cannot be opened (for example, an unusual special file). */
 static int host_stat_follow(const char *path,HostStat *s) {
     if (host_stat(path,s)) return -1;
-    DWORD attributes=GetFileAttributesA(path);
+    DWORD attributes=host_attributes(path);
     if (attributes==INVALID_FILE_ATTRIBUTES || !(attributes&FILE_ATTRIBUTE_REPARSE_POINT) ||
         (attributes&FILE_ATTRIBUTE_DIRECTORY)) return 0;
-    int fd=open(path,O_RDONLY|O_BINARY);
+    int fd=host_open(path,O_RDONLY|O_BINARY,0);
     if (fd>=0) {
         HostStat target;
         if (!host_fstat(fd,&target)) *s=target;
@@ -239,7 +268,7 @@ static int64_t do_open(const char *guest,int flags,int mode) {
         if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
         return -e;
     } else {
-        host=open(path,host_flags(flags)&~O_DIRECTORY,_S_IREAD|_S_IWRITE);
+        host=host_open(path,host_flags(flags)&~O_DIRECTORY,_S_IREAD|_S_IWRITE);
         if (host<0) {
             e=errno;
             if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
@@ -481,7 +510,7 @@ static int64_t do_truncate(const char *guest,int64_t length) {
     int e=translate(guest,path,sizeof(path));
     if (e) return -e;
 #ifdef _WIN32
-    int h=open(path,O_RDWR|O_BINARY);
+    int h=host_open(path,O_RDWR|O_BINARY,0);
     if (h<0) return -errno;
     int r=_chsize_s(h,length) ? -errno : 0;
     close(h);

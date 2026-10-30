@@ -137,4 +137,8 @@ if [[ ${1:-} == --test ]]; then
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -c src/isa_rewrite.c -I. -Isrc -o out/isa_rewrite.o
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -mbmi -mlzcnt -I. -Isrc tests/test_isa_stub.c out/isa_rewrite.o out/isa_emulate.o -o out/isa-stub-test
     out/isa-stub-test tests/data/isa_fixture.bin
+    if [[ "$(uname -s)" == MINGW* ]] && grep -q f16c /proc/cpuinfo 2>/dev/null; then
+        "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -I. -Isrc tests/test_isa_f16c.c out/isa_rewrite.o out/isa_emulate.o -o out/isa-f16c-test
+        out/isa-f16c-test
+    fi
 fi

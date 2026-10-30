@@ -13,6 +13,8 @@
 #define VK_USE_PLATFORM_XLIB_KHR
 #endif
 
+#include <cstdio>
+#include <string>
 #include <vector>
 #include <fmt/ranges.h>
 
@@ -229,6 +231,15 @@ std::vector<const char*> GetInstanceLayers(bool enable_validation, bool enable_c
                   vk::to_string(properties_result));
         return {};
     }
+
+    // gow3: the layers installed on this PC (ReShade, overlays, capture tools load as implicit
+    // ones), for reports of crashes or of ReShade not showing.
+    std::string names;
+    for (const auto& property : properties) {
+        names += names.empty() ? "" : ", ";
+        names += property.layerName.data();
+    }
+    std::printf("Vulkan layers on this PC: %s\n", names.c_str());
 
     std::vector<const char*> layers;
     layers.reserve(2);

@@ -41,7 +41,7 @@ FROZEN = getattr(sys, 'frozen', False)
 PORT_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
 
-VERSION = '0.6.0'
+VERSION = '0.7.0'
 TITLE_ID = 'CUSA00190'
 # Other releases of the game players run (their languages), accepted untested: the port was built and
 # tested on CUSA00190. Every one must be at version 01.81.
@@ -183,6 +183,8 @@ TEXTS = {
         'vibration': 'Vibración',
         'dead_zone': 'Zona muerta de sticks', 'pad_speaker': 'Altavoz del mando',
         'quick_menu': 'Mantener Select/Share: menú rápido', 'quick_menu_hint': 'Consejos al iniciar',
+        'menu_combo': 'Botones que abren el menú del port',
+        'menu_combos': ['R3 + L2', 'L3 + R3', 'Share + Options', 'Ninguno (solo Insert)'],
         'quick_menu_help': 'Mantenerlo apretado ~1 segundo abre Continuar / Ajustes / Salir del juego desde el '
                            'mando; un toque corto sigue funcionando como siempre (touchpad). Consejos: al empezar, '
                            'un aviso breve de cómo usar el dron OWL con teclado (Supr + mouse) y del menú rápido.',
@@ -237,6 +239,7 @@ TEXTS = {
         'perf_heading': 'Rendimiento',
         'draw_pipe': 'Dibujo en paralelo (2 hilos de GPU)',
         'nowait_writes': 'Copias del juego sin esperar a la GPU',
+        'fast_locks': 'Sincronización rápida entre hilos del juego',
         'perf_help': 'Más FPS y más uso de la GPU. Si ves errores gráficos o el juego se cierra, '
                      'desactivalos de a uno para comparar y contanos en un issue.',
         'smart_pending': 'Saltar dibujos mientras su shader compila',
@@ -262,6 +265,20 @@ TEXTS = {
         'update_previous_failed': 'La última actualización no se pudo aplicar. Probá de nuevo o descargala desde GitHub.',
         'check_updates': 'Buscar actualizaciones al iniciar', 'check_updates_now': 'Buscar actualizaciones',
         'discord_rpc': 'Mostrar en Discord que estás jugando',
+        'reshade': 'ReShade',
+        'reshade_help': 'Instalalo con el instalador de ReShade sobre bin\\KillzoneShadowFall.exe (no sobre el '
+                        'launcher) y elegí Vulkan. Con el escalado, los efectos que usan profundidad pueden no '
+                        'alinearse; si la generación de frames falla con ReShade, desactivala.',
+        'reshade_found': 'Estado: instalado en bin.', 'reshade_missing': 'Estado: no instalado.',
+        'open_bin': 'Abrir carpeta bin',
+        'shortcut': 'Acceso directo en el escritorio',
+        'shortcut_help': 'Abre el juego directo, sin el launcher, con las opciones guardadas.',
+        'shortcut_create': 'Crear', 'shortcut_done': 'Acceso directo creado en el escritorio.',
+        'shortcut_failed': 'No se pudo crear el acceso directo: {error}',
+        'game_language': 'Idioma del juego',
+        'game_language_auto': 'Automático (el de Windows si el juego lo trae)',
+        'game_language_help': 'Textos y voces. Solo aparecen los idiomas que trae tu copia del juego; cada '
+                              'región trae los suyos (la americana: inglés y francés).',
         'discord_rpc_help': 'Discord muestra "Killzone Shadow Fall" y el tiempo jugado en tu perfil (Discord '
                             'tiene que estar abierto).',
         'updates': 'Actualizaciones',
@@ -275,6 +292,10 @@ TEXTS = {
         'hint_device_lost': 'El driver de video reinició la GPU (dispositivo perdido). Actualizá el driver; '
                             'si sigue pasando, desactivá la generación de frames y FSR 4/DLSS.',
         'hint_game_fatal': 'El juego se detuvo con este error: {message}',
+        'hint_data_file': 'Falta o está dañado un archivo del juego. Volvé a extraer el juego (y la '
+                          'actualización) en una carpeta corta, por ejemplo C:\\Juegos\\KZ: algunos extractores '
+                          'saltean los archivos de nombre largo. Si tu copia es de otra región, elegí su idioma en '
+                          'Avanzado → Idioma del juego.',
         'hint_gpu_assert': 'Falló una comprobación del renderizador. Si se repite en el mismo lugar, '
                            'reportalo en GitHub con los dos archivos de log.',
         'cant_start': 'No se pudo iniciar el juego:\n{error}',
@@ -377,6 +398,8 @@ TEXTS = {
         'vibration': 'Vibration',
         'dead_zone': 'Stick dead zone', 'pad_speaker': 'Controller speaker',
         'quick_menu': 'Hold Select/Share: quick menu', 'quick_menu_hint': 'Tips at startup',
+        'menu_combo': 'Buttons that open the port menu',
+        'menu_combos': ['R3 + L2', 'L3 + R3', 'Share + Options', 'None (Insert only)'],
         'quick_menu_help': 'Holding it about a second opens Resume / Settings / Exit game from the controller; '
                            'a short press still works as usual (touchpad). Tips: a short note at startup on '
                            'using the OWL drone with the keyboard (Delete + mouse) and the quick menu.',
@@ -431,6 +454,7 @@ TEXTS = {
         'perf_heading': 'Performance',
         'draw_pipe': 'Parallel drawing (2 GPU threads)',
         'nowait_writes': 'Game copies without waiting for the GPU',
+        'fast_locks': 'Fast synchronization between game threads',
         'perf_help': 'More FPS and higher GPU usage. If you see graphics errors or the game closes, '
                      'turn them off one at a time to compare and tell us in an issue.',
         'smart_pending': 'Skip draws while their shader compiles',
@@ -456,6 +480,20 @@ TEXTS = {
         'update_previous_failed': 'The last update could not be applied. Try again or download it from GitHub.',
         'check_updates': 'Check for updates at startup', 'check_updates_now': 'Check for updates',
         'discord_rpc': 'Show on Discord that you are playing',
+        'reshade': 'ReShade',
+        'reshade_help': 'Install it with the ReShade installer on bin\\KillzoneShadowFall.exe (not on the '
+                        'launcher) and choose Vulkan. With upscaling, effects that use depth may not line up; if '
+                        'frame generation fails with ReShade, turn it off.',
+        'reshade_found': 'Status: installed in bin.', 'reshade_missing': 'Status: not installed.',
+        'open_bin': 'Open bin folder',
+        'shortcut': 'Desktop shortcut',
+        'shortcut_help': 'Starts the game directly, without the launcher, with the saved options.',
+        'shortcut_create': 'Create', 'shortcut_done': 'Shortcut created on the desktop.',
+        'shortcut_failed': 'The shortcut could not be created: {error}',
+        'game_language': 'Game language',
+        'game_language_auto': "Automatic (Windows' language when the game has it)",
+        'game_language_help': 'Texts and voices. Only the languages your copy of the game has are listed; '
+                              'each region has its own (the US release: English and French).',
         'discord_rpc_help': 'Discord shows "Killzone Shadow Fall" and the time played on your profile (Discord '
                             'must be open).',
         'updates': 'Updates',
@@ -469,6 +507,9 @@ TEXTS = {
         'hint_device_lost': 'The graphics driver reset the GPU (device lost). Update the driver; if it '
                             'keeps happening, turn off frame generation and FSR 4/DLSS.',
         'hint_game_fatal': 'The game stopped with this error: {message}',
+        'hint_data_file': 'A game file is missing or damaged. Extract the game (and its update) again into a '
+                          'short folder such as C:\\Games\\KZ: some extractors skip files with long names. If your '
+                          'copy is from another region, choose its language in Advanced → Game language.',
         'hint_gpu_assert': 'A renderer check failed. If it happens again at the same place, report it '
                            'on GitHub with both log files.',
         'cant_start': 'The game could not start:\n{error}',
@@ -490,7 +531,11 @@ def crash_hint(run_dir):
     # The game's own fatal error message (probe.c prints it from Killzone's error handler).
     for line in text.splitlines():
         if line.startswith('Game fatal error: '):
-            return tr('hint_game_fatal', message=line[len('Game fatal error: '):].strip()[:300])
+            message = line[len('Game fatal error: '):].strip()[:300]
+            hint = tr('hint_game_fatal', message=message)
+            if 'cache:lumps' in message or 'data file' in message:
+                hint += '\n\n' + tr('hint_data_file')
+            return hint
     checks = (
         ('hint_memory', ('of guest memory', 'page file large enough')),
         ('hint_vram', ('ErrorOutOfDeviceMemory', 'OutOfDeviceMemory', 'out of video memory')),
@@ -590,6 +635,52 @@ def update_folder_root(update_dir):
     return inner[0] if len(inner) == 1 else root
 
 
+# The game's language is the PS4 system language (runtime GOW3_LANGUAGE, issue #67); each one it has
+# is a folder of localcachepink/lumps. A dump only holds the languages of its region (the US release:
+# english and french), and asking for a missing one stops the game when the level loads.
+GAME_LANGUAGES = (  # (lumps folder, PS4 language id, name in that language, Windows primary language)
+    ('english', 1, 'English', 0x09), ('french', 2, 'Français', 0x0c), ('spanish', 3, 'Español', 0x0a),
+    ('german', 4, 'Deutsch', 0x07), ('italian', 5, 'Italiano', 0x10), ('dutch', 6, 'Nederlands', 0x13),
+    ('portuguese', 7, 'Português', 0x16), ('russian', 8, 'Русский', 0x19), ('korean', 9, '한국어', 0x12),
+    ('japanese', 0, '日本語', 0x11), ('finnish', 12, 'Suomi', 0x0b), ('swedish', 13, 'Svenska', 0x1d),
+    ('danish', 14, 'Dansk', 0x06), ('norwegian', 15, 'Norsk', 0x14), ('polish', 16, 'Polski', 0x15),
+    ('turkish', 19, 'Türkçe', 0x1f), ('arabic', 21, 'العربية', 0x01))
+
+
+def game_languages(game_dir, update_dir=''):
+    """The GAME_LANGUAGES the dump (and its update) has folders for, in that order."""
+    found = set()
+    for folder in (game_dir, update_dir and update_folder_root(update_dir)):
+        try:
+            found |= {d.name.casefold() for d in (Path(folder) / 'localcachepink' / 'lumps').iterdir()
+                      if d.is_dir()} if folder else set()
+        except OSError:
+            pass
+    return [entry for entry in GAME_LANGUAGES if entry[0] in found]
+
+
+def game_language_id(settings):
+    """The PS4 language id for settings['game_language'] ('auto': Windows' language when the dump has
+    it, else English, else the first one it has)."""
+    available = game_languages(settings.get('game_dir'), settings.get('update_dir'))
+    if not available:
+        return 1
+    chosen = settings.get('game_language', 'auto')
+    for folder, ident, _, _ in available:
+        if folder == chosen:
+            return ident
+    primary = 0
+    if WINDOWS:
+        try:
+            primary = ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3ff
+        except (AttributeError, OSError):
+            pass
+    for folder, ident, _, windows in available:
+        if windows == primary:
+            return ident
+    return next((ident for folder, ident, _, _ in available if folder == 'english'), available[0][1])
+
+
 def check_game(game_dir, update_dir):
     """(ok, message, needs_update): whether these folders hold Killzone Shadow Fall 01.81."""
     if not game_dir:
@@ -643,10 +734,10 @@ LAUNCHER_DEFAULTS = {'game_dir': '', 'update_dir': '', 'language': '', 'window_s
                      'key_map': {}, 'pad_map': {}, 'mouse_look': True, 'mouse_sens': 1.0,
                      'mouse_invert': False, 'mouse_turn_boost': 6, 'check_updates': True,
                      'smart_pending': True, 'precompile': True,
-                     'draw_pipe': True, 'nowait_writes': True,
+                     'draw_pipe': True, 'nowait_writes': True, 'fast_locks': True,
                      'res_method': 'upscale', 'discord_rpc': True, 'pad_dead_zone': 0,
                      'pad_speaker': 100, 'fov': 100, 'quick_menu': True, 'quick_menu_hint': True,
-                     'prompt_style': 0, 'upscale_quality': 'native'}
+                     'menu_combo': 0, 'prompt_style': 0, 'upscale_quality': 'native', 'game_language': 'auto'}
 # Discord Rich Presence: the application "Killzone Shadow Fall" (its name is what Discord shows) and the
 # key of its large image asset. Empty ID: no presence.
 DISCORD_ID = '1562348304153706608'
@@ -705,6 +796,11 @@ BUTTONS = (
     ('touchpad_left', 'Touch ←', 'Tab', ''), ('touchpad_right', 'Touch →', 'Backspace', 'back'),
     ('up', '↑', 'Up', 'dpup'), ('down', '↓', 'Down', 'dpdown'), ('left', '←', 'Left', 'dpleft'),
     ('right', '→', 'Right', 'dpright'),
+    # The left stick's keys and touchpad swipes (runtime_pad.c move_*, swipe_*; issues #83, #89, #92).
+    ('move_forward', 'Move ↑', 'W', ''), ('move_back', 'Move ↓', 'S', ''),
+    ('move_left', 'Move ←', 'A', ''), ('move_right', 'Move →', 'D', ''),
+    ('swipe_up', 'Swipe ↑', '', ''), ('swipe_down', 'Swipe ↓', '', ''),
+    ('swipe_left', 'Swipe ←', '', ''), ('swipe_right', 'Swipe →', '', ''),
 )
 # Controller buttons a PS4 button can take: SDL name and the label shown (Xbox / PlayStation).
 PAD_BUTTONS = (
@@ -717,7 +813,7 @@ PAD_BUTTONS = (
 )
 # Keys the game itself or the port already uses: not offered for buttons.
 TK_MOUSE = {1: 'Mouse Left', 2: 'Mouse Middle', 3: 'Mouse Right', 4: 'Mouse 4', 5: 'Mouse 5'}
-RESERVED_KEYS = {'W', 'A', 'S', 'D', 'Insert', 'Delete', 'F9', 'F11', 'F12', 'Escape'}
+RESERVED_KEYS = {'Insert', 'Delete', 'F9', 'F11', 'F12', 'Escape'}
 # Tk keysyms that differ from SDL scancode names.
 TK_TO_SDL = {
     'space': 'Space', 'Shift_L': 'Left Shift', 'Shift_R': 'Right Shift', 'Control_L': 'Left Ctrl',
@@ -778,6 +874,7 @@ SHARED_SETTINGS = {
     'pad_speaker': (int, lambda v: str(int(v))),
     'quick_menu': (bool, lambda v: '1' if v else '0'),
     'quick_menu_hint': (bool, lambda v: '1' if v else '0'),
+    'menu_combo': (int, lambda v: str(max(0, min(3, int(v))))),
     'prompt_style': (int, lambda v: str(int(v))),
     # Quality mode: the in-game menu switches it live between reduced modes, or for the next start.
     'upscale_quality': (str, lambda v: v if v in UPSCALE_QUALITIES else 'native'),
@@ -787,6 +884,26 @@ SHARED_SETTINGS = {
 def write_launcher_file(settings):
     USER_DIR.mkdir(parents=True, exist_ok=True)
     LAUNCHER_FILE.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+
+def create_play_shortcut():
+    """A desktop shortcut that starts the game with --play (issues #79, #86). Its path."""
+    exe = Path(sys.executable) if getattr(sys, 'frozen', False) else PORT_DIR / 'Killzone Shadow Fall.exe'
+    icon = PORT_DIR / 'launcher' / 'kzsf.ico'
+    script = (
+        "$d=[Environment]::GetFolderPath('Desktop');"
+        "$l=Join-Path $d 'Killzone Shadow Fall (play).lnk';"
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($l);"
+        f"$s.TargetPath='{str(exe).replace(chr(39), chr(39) * 2)}';$s.Arguments='--play';"
+        f"$s.WorkingDirectory='{str(PORT_DIR).replace(chr(39), chr(39) * 2)}';"
+        + (f"$s.IconLocation='{str(icon).replace(chr(39), chr(39) * 2)}';" if icon.is_file() else '')
+        + "$s.Save();$l")
+    result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', script],
+                            capture_output=True, text=True, timeout=30,
+                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    if result.returncode != 0 or not result.stdout.strip():
+        raise OSError((result.stderr or 'PowerShell failed').strip().splitlines()[-1])
+    return result.stdout.strip()
 
 
 def load_launcher():
@@ -970,8 +1087,12 @@ def game_env(settings, graphics, needs_update):
             'GOW3_DRAW_PIPE', '1' if settings.get('draw_pipe', True) else '0'),
         'GOW3_NOWAIT_WRITES': os.environ.get(
             'GOW3_NOWAIT_WRITES', '3d99a2' if settings.get('nowait_writes', True) else ''),
+        # PR #96 (clearfeather): rwlock bookkeeping split over 256 locks instead of one.
+        'GOW3_RWLOCK_FAST': os.environ.get(
+            'GOW3_RWLOCK_FAST', '1' if settings.get('fast_locks', True) else '0'),
         # One save folder for every release of the game: switching region keeps the saves.
         'GOW3_SAVEDATA_ID': TITLE_ID,
+        'GOW3_LANGUAGE': os.environ.get('GOW3_LANGUAGE', str(game_language_id(settings))),
     })
     # Upscaling method (any saved value but 'patch'): above 1080p the game stays at 1080p (run.py
     # drops the patch) and FSR 3.1 reaches the output, with the UI and videos drawn at that size.
@@ -1831,7 +1952,7 @@ class Launcher:
         row.pack(fill='x', pady=(self.px(6), 0))
         self.tk.Label(row, text=tr('perf_heading') + ':', bg=PANEL, fg=ACCENT,
                       font=self.font(9, 'bold')).pack(side='left')
-        for key in ('draw_pipe', 'nowait_writes'):
+        for key in ('draw_pipe', 'nowait_writes', 'fast_locks'):
             var = self.tk.BooleanVar(value=bool(self.settings.get(key, True)))
 
             def changed(key=key, var=var):
@@ -1932,7 +2053,7 @@ class Launcher:
         self.settings.update(window_size='1920x1080', key_map={}, pad_map={}, mouse_look=True, mouse_sens=1.0,
                              mouse_invert=False, mouse_turn_boost=6, smart_pending=True, precompile=True,
                              draw_pipe=True,
-                             nowait_writes=True,
+                             nowait_writes=True, fast_locks=True,
                              res_method='upscale', frame_gen='off', ultrawide='off',
                              discord_rpc=True, pad_dead_zone=0, pad_speaker=100, fov=100,
                              quick_menu=True, quick_menu_hint=True)
@@ -2007,6 +2128,7 @@ class Launcher:
                 self.root.after(0, lambda e=e: self.update_failed(e))
                 return
             self.root.after(0, self.root.destroy)
+            kzsf_update.exit_for_update()
         threading.Thread(target=work, daemon=True).start()
 
     def update_failed(self, error):
@@ -2087,6 +2209,30 @@ class Launcher:
         self.root.destroy()
 
 
+def direct_play():
+    """--play (issue #48, Steam and other front ends): the game with the saved options, no launcher
+    window; waits for it (restarts included) and returns its exit code. None when the folders are
+    not ready: the launcher opens instead."""
+    settings, graphics = load_launcher(), load_graphics()
+    ok, _, needs_update = check_game(settings['game_dir'], settings['update_dir'])
+    if not ok:
+        return None
+    while True:
+        process, out, err, run_dir = launch_game(settings, graphics, needs_update)
+        code = process.wait()
+        out.close()
+        err.close()
+        if code != RESTART_CODE:
+            break
+        # "Apply and restart" in the game: the options it changed (gow3.ini) are read again.
+        settings, graphics = load_launcher(), load_graphics()
+    # game_ended asks whether to open the logs: Yes opens the run's folder.
+    if code not in (0, None) and WINDOWS and ctypes.windll.user32.MessageBoxW(
+            None, game_ended_text(code, run_dir), 'Killzone Shadow Fall', 0x34) == 6:
+        os.startfile(run_dir)
+    return code
+
+
 def main():
     global LANG
     args = sys.argv[1:]
@@ -2094,6 +2240,10 @@ def main():
         sys.exit(run_role(args))
     settings = load_launcher()
     LANG = settings.get('language') or windows_language()
+    if args and args[0] in ('--play', '-play', '/play'):
+        code = direct_play()
+        if code is not None:
+            sys.exit(code)
     if WINDOWS:
         try:
             ctypes.windll.shcore.SetProcessDpiAwareness(1)

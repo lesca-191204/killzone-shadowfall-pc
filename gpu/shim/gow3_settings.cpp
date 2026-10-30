@@ -153,6 +153,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.quick_menu = i != 0;
     } else if (key == "quick_menu_hint") {
         v.quick_menu_hint = i != 0;
+    } else if (key == "menu_combo") {
+        v.menu_combo = std::clamp(i, 0, 3);
     } else if (key == "motion_blur") {
         v.motion_blur = value.empty() || i != 0;
     } else if (key == "depth_of_field") {
@@ -246,7 +248,7 @@ void Load() {
         {"GOW3_MOUSE_INVERT_Y", "mouse_invert"},      {"GOW3_FOV", "fov"}, {"GOW3_LOD_DISTANCE", "lod_distance"},
         {"GOW3_PAD_SPEAKER_VOLUME", "pad_speaker"},   {"GOW3_QUICK_MENU", "quick_menu"},
         {"GOW3_PROMPT_STYLE", "prompt_style"},
-        {"GOW3_QUICK_MENU_HINT", "quick_menu_hint"},
+        {"GOW3_QUICK_MENU_HINT", "quick_menu_hint"},  {"GOW3_MENU_COMBO", "menu_combo"},
         {"GOW3_MOTION_BLUR", "motion_blur"},          {"GOW3_DEPTH_OF_FIELD", "depth_of_field"},
         {"GOW3_BLOOM", "bloom"},                      {"GOW3_FILM_GRAIN", "film_grain"},
         {"GOW3_CAMERA_SHAKE", "camera_shake"},        {"GOW3_UPSCALE_QUALITY", "upscale_quality"},
@@ -393,10 +395,11 @@ void Save() {
                  v.anisotropy.load(), v.vibration.load(), v.mip_lod_bias.load(), v.lod_distance.load());
     std::fprintf(file,
                  "mouse_sens=%.1f\nmouse_turn_boost=%d\nmouse_invert=%d\nfov=%d\npad_dead_zone=%d\n"
-                 "pad_speaker=%d\nprompt_style=%d\nquick_menu=%d\nquick_menu_hint=%d\nupscaling_from_menu=%d\n",
+                 "pad_speaker=%d\nprompt_style=%d\nquick_menu=%d\nquick_menu_hint=%d\nmenu_combo=%d\n"
+                 "upscaling_from_menu=%d\n",
                  v.mouse_sens.load(), v.mouse_turn_boost.load(), int(v.mouse_invert.load()), v.fov.load(),
                  v.pad_dead_zone.load(), v.pad_speaker.load(), v.prompt_style.load(), int(v.quick_menu.load()),
-                 int(v.quick_menu_hint.load()), int(v.upscaling_from_menu.load()));
+                 int(v.quick_menu_hint.load()), v.menu_combo.load(), int(v.upscaling_from_menu.load()));
     std::fprintf(file, "motion_blur=%d\ndepth_of_field=%d\nbloom=%d\nfilm_grain=%d\ncamera_shake=%d\n",
                  int(v.motion_blur.load()), int(v.depth_of_field.load()), int(v.bloom.load()),
                  int(v.film_grain.load()), int(v.camera_shake.load()));

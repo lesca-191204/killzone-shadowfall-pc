@@ -114,10 +114,15 @@ bool AccurateSleep(const std::chrono::nanoseconds duration, std::chrono::nanosec
     LARGE_INTEGER interval{
         .QuadPart = -1 * (duration.count() / 100u),
     };
-    HANDLE timer = ::CreateWaitableTimer(NULL, TRUE, NULL);
+    // gow3: one high-resolution timer per thread (Windows 10 1803+): a plain waitable timer
+    // wakes on the system tick (1 to 15.6 ms), which made frame-limited flips uneven (#66).
+    thread_local const HANDLE timer = [] {
+        HANDLE handle = ::CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                                                 TIMER_ALL_ACCESS);
+        return handle ? handle : ::CreateWaitableTimerExW(NULL, NULL, 0, TIMER_ALL_ACCESS);
+    }();
     SetWaitableTimer(timer, &interval, 0, NULL, NULL, 0);
     const auto ret = WaitForSingleObjectEx(timer, INFINITE, interruptible);
-    ::CloseHandle(timer);
 
     if (remaining) {
         const auto end_sleep = std::chrono::high_resolution_clock::now();
@@ -223,6 +228,19 @@ void SetThreadName(void* thread, const char* name) {
 #endif
 
 #endif
+
+void PreciseSleepUntil(std::chrono::steady_clock::time_point deadline) {
+    using namespace std::chrono_literals;
+    auto now = std::chrono::steady_clock::now();
+    if (deadline - now > 1ms) {
+        AccurateSleep(deadline - now - 500us, nullptr, false);
+    }
+    while ((now = std::chrono::steady_clock::now()) < deadline) {
+        if (deadline - now > 200us) {
+            std::this_thread::yield();
+        }
+    }
+}
 
 AccurateTimer::AccurateTimer(std::chrono::nanoseconds target_interval)
     : target_interval(target_interval) {}

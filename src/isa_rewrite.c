@@ -179,10 +179,61 @@ static int rel32_to(const unsigned char *next, const unsigned char *target, int3
     return 1;
 }
 
+/* vcvtph2ps xmm/ymm(dst), xmm(src1) (issue #7, CPUs without F16C): the source is stored with a
+ * legacy SSE move, isa_half_to_float (general registers only) converts it on the stack and a VEX
+ * vmovups loads the floats, zeroing the upper half for an xmm destination like the instruction.
+ * The caller-saved general registers and the flags are kept; no XMM/YMM register but dst changes. */
+static size_t emit_f16c_stub(unsigned char *code, const unsigned char *at, const IsaSite *s, uint64_t *hit,
+                             unsigned char *image) {
+    static const uint8_t lea_rsp_down[] = {0x48, 0x8d, 0xa4, 0x24, 0x00, 0xff, 0xff, 0xff};   /* lea rsp,[rsp-0x100] */
+    static const uint8_t lea_rsp_up[] = {0x48, 0x8d, 0xa4, 0x24, 0x00, 0x01, 0x00, 0x00};     /* lea rsp,[rsp+0x100] */
+    static const uint8_t saved[] = {0, 1, 2, 6, 7, 8, 9, 10, 11, 5};   /* rax rcx rdx rsi rdi r8-r11 rbp */
+    const int ymm = s->width == 1, dst = s->dst, src = s->src1;
+    unsigned char *p = code;
+    emit_bytes(&p, lea_rsp_down, sizeof lea_rsp_down);
+    emit_u8(&p, 0x9c);                                              /* pushfq */
+    for (size_t i = 0; i < sizeof saved; i++) {                     /* push reg */
+        if (saved[i] >= 8) emit_u8(&p, 0x41);
+        emit_u8(&p, (uint8_t)(0x50 + (saved[i] & 7)));
+    }
+    emit_bytes(&p, (const uint8_t[]){0x48, 0x89, 0xe5}, 3);         /* mov rbp, rsp */
+    emit_bytes(&p, (const uint8_t[]){0x48, 0x83, 0xec, 0x40}, 4);   /* sub rsp, 0x40 */
+    emit_bytes(&p, (const uint8_t[]){0x48, 0x83, 0xe4, 0xe0}, 4);   /* and rsp, -32 */
+    emit_u8(&p, 0xf3);                                              /* movdqu [rsp+0x20], xmm<src> */
+    if (src >= 8) emit_u8(&p, 0x44);
+    emit_bytes(&p, (const uint8_t[]){0x0f, 0x7f, (uint8_t)(0x44 | (src & 7) << 3), 0x24, 0x20}, 5);
+    emit_bytes(&p, (const uint8_t[]){0x48, 0x8d, 0x7c, 0x24, 0x20}, 5); /* lea rdi, [rsp+0x20] */
+    emit_bytes(&p, (const uint8_t[]){0x48, 0x89, 0xe6}, 3);         /* mov rsi, rsp */
+    emit_u8(&p, 0xba);                                              /* mov edx, count */
+    emit_u32(&p, ymm ? 8 : 4);
+    emit_bytes(&p, (const uint8_t[]){0x48, 0xb8}, 2);               /* mov rax, &hits[i] */
+    emit_u64(&p, (uint64_t)(uintptr_t)hit);
+    emit_bytes(&p, (const uint8_t[]){0x48, 0xff, 0x00}, 3);         /* inc qword [rax] */
+    emit_bytes(&p, (const uint8_t[]){0x48, 0xb8}, 2);               /* mov rax, isa_half_to_float */
+    emit_u64(&p, (uint64_t)(uintptr_t)isa_half_to_float);
+    emit_bytes(&p, (const uint8_t[]){0xff, 0xd0}, 2);               /* call rax */
+    /* vmovups xmm/ymm<dst>, [rsp] (VEX2: ~R, vvvv 1111, L, pp 00) */
+    emit_bytes(&p, (const uint8_t[]){0xc5, (uint8_t)((dst < 8 ? 0x80 : 0) | 0x78 | (ymm ? 4 : 0)), 0x10,
+                                     (uint8_t)(0x04 | (dst & 7) << 3), 0x24}, 5);
+    emit_bytes(&p, (const uint8_t[]){0x48, 0x89, 0xec}, 3);         /* mov rsp, rbp */
+    for (size_t i = sizeof saved; i-- > 0;) {                       /* pop reg */
+        if (saved[i] >= 8) emit_u8(&p, 0x41);
+        emit_u8(&p, (uint8_t)(0x58 + (saved[i] & 7)));
+    }
+    emit_u8(&p, 0x9d);                                              /* popfq */
+    emit_bytes(&p, lea_rsp_up, sizeof lea_rsp_up);
+    int32_t rel;
+    if (!rel32_to(at + (p - code) + JMP_BYTES, image + s->offset + s->length, &rel)) return 0;
+    emit_u8(&p, 0xe9);
+    emit_u32(&p, (uint32_t)rel);
+    return (size_t)(p - code);
+}
+
 /* Writes the stub for `s` into `code` (laid out to run at `at`). Returns its size, or 0 when the
  * jmp back is out of rel32 range. */
 static size_t emit_stub(unsigned char *code, const unsigned char *at, const IsaSite *s, uint64_t *hit,
                         unsigned char *image) {
+    if (s->kind == ISA_VCVTPH2PS) return emit_f16c_stub(code, at, s, hit, image);
     static const uint8_t lea_rsp_down[] = {0x48, 0x8d, 0xa4, 0x24, 0x00, 0xff, 0xff, 0xff};   /* lea rsp,[rsp-0x100] */
     static const uint8_t lea_rax_rsp_up[] = {0x48, 0x8d, 0x84, 0x24, 0x00, 0x01, 0x00, 0x00}; /* lea rax,[rsp+0x100] */
     static const uint8_t lea_rsp_up[] = {0x48, 0x8d, 0xa4, 0x24, 0x00, 0x01, 0x00, 0x00};     /* lea rsp,[rsp+0x100] */

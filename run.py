@@ -167,6 +167,8 @@ def main():
     out = data / 'out'
     out.mkdir(parents=True, exist_ok=True)
     env.setdefault('GOW3_CONFIG', str(data / 'gow3.ini'))
+    # Frame and upscaler dumps (GOW3_FRAME_DUMP_TRIGGER, GOW3_DUMP_TRIGGER) go beside the logs.
+    env.setdefault('GOW3_DUMP_DIR', str(out / 'dump'))
     # Values this script derived on the previous start ("Apply and restart" inherits them) are
     # derived again from the new options.
     for key in env.pop('GOW3_DERIVED', '').split(','):

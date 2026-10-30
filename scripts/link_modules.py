@@ -34,7 +34,7 @@ def canonical(identity, fallback=None):
 
 def module(path):
     source = read_self(path)
-    elf, header, ph, _, missing = parse_self(source)
+    elf, header, ph, _, missing = parse_self(source, Path(path).name)
     dp = next(p for p in ph if p['type'] == 2)
     dynamic = []
     for pos in range(dp['offset'], dp['offset'] + dp['filesz'], 16):

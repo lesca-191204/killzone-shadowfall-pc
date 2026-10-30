@@ -171,7 +171,7 @@ function row(item) {
       wide = true;
       return h('div.row.wide', h('div', h('div.row-label', item.label), helpText(ui.cacheText || '')), h('div.control', control));
     case 'button':
-      control = h(`button.btn${item.danger ? '.danger' : ''}`, { onclick: () => action(item.id) }, icon('reset'), item.button);
+      control = h(`button.btn${item.danger ? '.danger' : ''}`, { onclick: () => action(item.id) }, icon(item.icon || 'reset'), item.button);
       return h('div.row.wide', h('div', h('div.row-label', item.label), helpText(item.help)), h('div.control', control));
   }
   if (item.type === 'toggle') wide = true;
@@ -212,7 +212,9 @@ function sdlKey(code) {
 
 function psBadge(b) {
   const cls = { cross: '.cross', circle: '.circle', square: '.square', triangle: '.triangle' }[b.name] || '';
-  const label = { options: 'OPT', touchpad_left: 'TP', touchpad_right: 'TP' }[b.name] || b.label;
+  const label = { options: 'OPT', touchpad_left: 'TP', touchpad_right: 'TP', move_forward: '↑', move_back: '↓',
+                  move_left: '←', move_right: '→', swipe_up: 'TP↑', swipe_down: 'TP↓', swipe_left: 'TP←',
+                  swipe_right: 'TP→' }[b.name] || b.label;
   return h(`span.ps${cls}${label.length > 2 ? '.wide' : ''}`, label);
 }
 
@@ -222,7 +224,7 @@ function keysSection(section) {
       group.buttons.map(b => {
         const key = S.key_map[b.name] || b.key;
         const cap = h(`button.keycap${ui.capturing === b.name ? '.capturing' : ''}`, { 'data-name': b.name,
-          onclick: (e) => { e.stopPropagation(); startCapture(b.name); } }, ui.capturing === b.name ? T('press_key') : key);
+          onclick: (e) => { e.stopPropagation(); startCapture(b.name); } }, ui.capturing === b.name ? T('press_key') : key || '—');
         return h('div.bind', psBadge(b), h('span.bind-name', (S.texts.buttons || {})[b.name] || b.label), cap);
       }))))];
 }
@@ -446,6 +448,13 @@ async function action(id) {
       return renderPage();
     case 'check_updates_now':
       return api().check_updates(false);
+    case 'open_bin':
+      return api().open_bin();
+    case 'create_shortcut': {
+      const r = await api().create_shortcut();
+      if (r && r.error) message(r.error); else if (r) toast(r.text);
+      return;
+    }
     case 'install_update': {
       if (!await confirmBox(S.update.confirm)) return;
       const r = await api().install_update();

@@ -29,6 +29,9 @@ enum { ISA_CF = 1u << 0, ISA_ZF = 1u << 6, ISA_SF = 1u << 7, ISA_OF = 1u << 11 }
 void isa_emulate_set_image(unsigned char *image);
 /* Executes the site's instruction on regs (spec 5.6). */
 void ABI isa_emulate(const IsaSite *site, IsaRegs *regs);
+/* vcvtph2ps (F16C, issue #7): count (4 or 8) half floats to floats, as bit patterns, without XMM
+ * registers. A VCVTPH2PS site's width is 1 for a ymm destination, 0 for xmm. */
+void ABI isa_half_to_float(const uint16_t *in, uint32_t *out, uint32_t count);
 /* Flags the instruction defines (the test compares only these). */
 uint64_t isa_defined_flags(uint8_t kind);
 

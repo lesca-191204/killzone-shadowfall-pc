@@ -62,6 +62,24 @@ static uint64_t zf_sf(const IsaSite *site, uint64_t result) {
     return (result == 0 ? ISA_ZF : 0) | (result >> (site->width - 1) & 1 ? ISA_SF : 0);
 }
 
+/* Every half is exactly a float: denormals become normal floats, NaNs stay NaNs (made quiet,
+ * like the instruction), infinities stay infinities. */
+static uint32_t half_to_float(uint16_t h) {
+    uint32_t sign = (uint32_t)(h & 0x8000u) << 16, exponent = h >> 10 & 0x1f, mantissa = h & 0x3ffu;
+    if (exponent == 0x1f) return sign | 0x7f800000u | (mantissa ? 0x400000u | mantissa << 13 : 0);
+    if (exponent == 0) {
+        if (!mantissa) return sign;
+        uint32_t shifts = 0;
+        while (!(mantissa & 0x400u)) { mantissa <<= 1; shifts++; }
+        return sign | (113u - shifts) << 23 | (mantissa & 0x3ffu) << 13;
+    }
+    return sign | (exponent + 112u) << 23 | mantissa << 13;
+}
+
+void ABI isa_half_to_float(const uint16_t *in, uint32_t *out, uint32_t count) {
+    for (uint32_t i = 0; i < count; i++) out[i] = half_to_float(in[i]);
+}
+
 uint64_t isa_defined_flags(uint8_t kind) {
     switch (kind) {
     case ISA_ANDN: case ISA_BLSI: case ISA_BLSMSK: case ISA_BLSR: return ISA_SF | ISA_ZF | ISA_CF | ISA_OF;

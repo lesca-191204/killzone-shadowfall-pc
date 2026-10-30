@@ -87,7 +87,10 @@ void DumpImages(const Instance& instance, Scheduler& scheduler, vk::CommandBuffe
                 int frame, std::initializer_list<DumpImage> images) {
     static const std::string dir = [] {
         const char* env = std::getenv("GOW3_DUMP_DIR");
-        return std::string{env && env[0] ? env : "out/dump"};
+        std::string path{env && env[0] ? env : "out/dump"};
+        std::error_code error;
+        std::filesystem::create_directories(path, error);
+        return path;
     }();
     const vk::MemoryBarrier2 before{
         .srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
@@ -394,6 +397,20 @@ bool TemporalUpscaler::OnFrameStart() {
     return changed;
 }
 
+void TemporalUpscaler::OnDisplayPass() {
+    // Without it such frames reached the screen at the scene size, jittered and without the
+    // game's TAA (skipped while the port jitters): pixelated and shaking (#81, #88).
+    if (!Scaled() || ui_phase || done_this_frame || failed || !Active() || !ldr_target ||
+        !camera_motion.Ready() || !camera_motion.Depth()) {
+        return;
+    }
+    static bool logged = false;
+    if (!std::exchange(logged, true)) {
+        std::printf("Upscaler: frames without UI upscaled at the display pass\n");
+    }
+    RunScaled();
+}
+
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
     if (cs_hash != trigger_hash || done_this_frame || failed || Scaled()) {
         return;
@@ -441,7 +458,15 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
     device_info.queue = instance.GetGraphicsQueue();
     device_info.queueFamilyIndex = instance.GetGraphicsQueueFamilyIndex();
     device_info.shaderFloat16Enabled = instance.IsShaderFloat16Enabled();
-    device_info.subgroupSizeControlEnabled = instance.IsSubgroupSizeControlEnabled();
+    // With subgroup size control on a 32..64 lane GPU (AMD) FSR 3.1 picks its "LUT" shader
+    // permutations, which no other vendor runs; RX 6600 lost the device in them (#68, #73).
+    // Without it FSR reports 32 lanes and uses the size-agnostic set NVIDIA/Intel run.
+    // GOW3_FSR_SUBGROUP_CONTROL=1 restores the AMD permutations.
+    {
+        const char* env = std::getenv("GOW3_FSR_SUBGROUP_CONTROL");
+        device_info.subgroupSizeControlEnabled =
+            env && env[0] == '1' && instance.IsSubgroupSizeControlEnabled();
+    }
     device_info.synchronization2Enabled = VK_TRUE;
     device_info.shaderStorageImageWriteWithoutFormatEnabled = VK_TRUE;
 

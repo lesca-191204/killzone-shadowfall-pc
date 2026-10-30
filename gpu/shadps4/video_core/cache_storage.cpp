@@ -13,9 +13,14 @@
 
 #include <miniz.h>
 
+#include <algorithm>
+#include <atomic>
 #include <condition_variable>
+#include <cstdio>
+#include <fstream>
 #include <functional>
 #include <future>
+#include <memory>
 #include <mutex>
 #include <queue>
 
@@ -326,6 +331,57 @@ void DataBase::ForEachBlobName(BlobType type,
     for (const auto& entry : std::filesystem::directory_iterator{cache_path, error}) {
         visit(entry.path().filename().string());
     }
+}
+
+void DataBase::StartPrefetch() {
+    if (!opened || EmulatorSettings.IsPipelineCacheArchived() || !prefetch_threads.empty()) {
+        return;
+    }
+    auto files = std::make_shared<std::vector<std::filesystem::path>>();
+    std::vector<std::filesystem::path> shaders;
+    const auto key_ext = "." + GetBlobFileExtension(BlobType::PipelineKey);
+    const auto spv_ext = "." + GetBlobFileExtension(BlobType::ShaderBinary);
+    const auto meta_ext = "." + GetBlobFileExtension(BlobType::ShaderMeta);
+    u64 bytes = 0;
+    std::error_code error;
+    for (const auto& entry : std::filesystem::directory_iterator{cache_path, error}) {
+        const auto ext = entry.path().extension().string();
+        if (ext == key_ext) {
+            files->push_back(entry.path());
+        } else if (ext == spv_ext || ext == meta_ext) {
+            shaders.push_back(entry.path());
+        } else {
+            continue;
+        }
+        bytes += entry.file_size(error);
+    }
+    // The keys first: the warm-up walks them in this order and loads shaders as they need.
+    files->insert(files->end(), shaders.begin(), shaders.end());
+    if (files->empty()) {
+        return;
+    }
+    const u32 threads = std::clamp(std::thread::hardware_concurrency() / 2, 2u, 8u);
+    std::printf("Pipeline cache: prefetching %zu files (%.0f MiB) on %u threads\n", files->size(),
+                bytes / 1048576.0, threads);
+    auto next = std::make_shared<std::atomic<size_t>>(0);
+    for (u32 i = 0; i < threads; ++i) {
+        prefetch_threads.emplace_back([files, next](std::stop_token token) {
+            Common::SetCurrentThreadName("shadPS4:PipelineCachePrefetch");
+            std::vector<char> buffer(1 << 18);
+            for (size_t index; !token.stop_requested() && (index = (*next)++) < files->size();) {
+                std::ifstream file{(*files)[index], std::ios::binary};
+                while (file.read(buffer.data(), buffer.size())) {
+                }
+            }
+        });
+    }
+}
+
+void DataBase::StopPrefetch() {
+    for (auto& thread : prefetch_threads) {
+        thread.request_stop();
+    }
+    prefetch_threads.clear(); // jthread joins
 }
 
 void DataBase::Remove(BlobType type, std::string_view name) {

@@ -97,8 +97,18 @@ fi
 zip="dist/KillzoneShadowFall-v$version-windows.zip"
 mkdir -p dist
 rm -f "$zip"
-(cd out/kzsf-stage && powershell -NoProfile -Command \
-    "Compress-Archive -Path '$name' -DestinationPath '../../$zip'")
+# Python's zipfile, not Compress-Archive: Windows PowerShell 5.1 stores "\" in the entry names,
+# which other unzip tools turn into files named after the folders (#87).
+out/pyenv/Scripts/python.exe - "$(cygpath -w "$PWD/out/kzsf-stage")" "$name" "$(cygpath -w "$PWD/$zip")" <<'PY'
+import os, sys, zipfile
+root, name, target = sys.argv[1:]
+with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+    for folder, dirs, files in os.walk(os.path.join(root, name)):
+        dirs.sort()
+        for file in sorted(files):
+            path = os.path.join(folder, file)
+            z.write(path, os.path.relpath(path, root).replace(os.sep, '/'))
+PY
 
 # Refresh dist/<name> (a playable copy), keeping what the player made there (user/) and the
 # downloaded FSR 4 shaders (launcher/kzsf_fsr4.py).

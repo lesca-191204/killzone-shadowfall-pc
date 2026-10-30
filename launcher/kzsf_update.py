@@ -134,8 +134,23 @@ def failed_update(work_dir):
 
 
 def run_script(script):
-    """Starts the update script on its own, without a console window."""
+    """Starts the update script on its own, without a console window. It leaves the launcher's job
+    when allowed: a job that kills its processes when the launcher closes (some shortcuts and game
+    launchers start it in one) took the script along before it copied anything (#87)."""
     flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
-    return subprocess.Popen(['cmd.exe', '/c', str(script)], cwd=str(Path(script).parent), creationflags=flags,
-                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            close_fds=True)
+    breakaway = getattr(subprocess, 'CREATE_BREAKAWAY_FROM_JOB', 0x01000000)
+    for extra in (breakaway, 0):
+        try:
+            return subprocess.Popen(['cmd.exe', '/c', str(script)], cwd=str(Path(script).parent),
+                                    creationflags=flags | extra, stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+        except OSError:
+            if not extra:
+                raise
+
+
+def exit_for_update(delay=1.5):
+    """Ends the launcher shortly after its window closed, whatever threads remain."""
+    import os
+    import threading
+    threading.Timer(delay, lambda: os._exit(0)).start()

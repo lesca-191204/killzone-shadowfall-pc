@@ -48,7 +48,9 @@
 enum {
     GOW3_PROMPT_ATLAS_WIDTH = 2048, GOW3_PROMPT_ATLAS_HEIGHT = 1024,
     GOW3_PROMPT_ATLAS_BYTES = GOW3_PROMPT_ATLAS_WIDTH * GOW3_PROMPT_ATLAS_HEIGHT * 4,
-    GOW3_PROMPT_GLYPHS = 27, GOW3_PROMPT_ICONS = 16,
+    /* Glyphs of a collection at most: 27 in the US English one, other languages' (Russian, #91)
+     * may hold more; each glyph is still checked against its rectangle. */
+    GOW3_PROMPT_GLYPHS = 48, GOW3_PROMPT_ICONS = 16,
     GOW3_PROMPT_DRAW = 0xfc4d90, GOW3_PROMPT_ATLASES = 4, GOW3_PROMPT_HOLDERS = 8,
     GOW3_PROMPT_ENTRY_LENGTH = 6, /* push rbp; mov rbp,rsp; push r15 (draw, function lookup) */
     GOW3_PROMPT_ATLAS_VTABLE = 0x14e0420,
@@ -197,7 +199,7 @@ static inline int gow3_prompt_prepare(Gow3PromptAtlas *pc, uintptr_t base, uintp
     int32_t count = 0;
     uint64_t entries = 0, quads = 0, source = 0, vtable = 0;
     uint32_t dims[2], flags = 0;
-    if (!read(collection + 0x18, &count, 4) || count != GOW3_PROMPT_GLYPHS ||
+    if (!read(collection + 0x18, &count, 4) || count <= 0 || count > GOW3_PROMPT_GLYPHS ||
         !read(collection + 0x20, &entries, 8) || !read(collection + 0x40, &quads, 8) ||
         !read(collection + 0x50, &source, 8) || !read(source, &vtable, 8) ||
         vtable != base + GOW3_PROMPT_ATLAS_VTABLE || !read(source + 8, &flags, 4) ||

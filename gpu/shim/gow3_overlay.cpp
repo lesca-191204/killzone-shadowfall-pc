@@ -71,6 +71,9 @@ std::mutex imgui_mutex; // the ImGui context: window thread (input) and present 
 bool initialized = false;
 std::atomic<bool> menu_open{false};
 bool r3_down = false, l2_down = false;
+// Controller shortcut of the menu (menu_combo, issue #63): 0 R3+L2, 1 L3+R3, 2 Back+Start,
+// 3 none (Insert only). The other buttons are tracked for combos 1 and 2.
+bool l3_down = false, back_down = false, start_down = false;
 // Quick menu (hold Select/Back/Share, runtime_pad.c): Resume / Settings / Exit game.
 std::atomic<bool> quick_open{false};
 // The FOV hook's float (src/probe.c), rewritten when the FOV changes; null without the hook.
@@ -515,6 +518,9 @@ void ControlsTab() {
                  s.quick_menu,
                  "Holding it about a second opens Resume / Settings / Exit game; a short press still "
                  "clicks the touchpad.");
+        static const char* const combo_labels[] = {"R3 + L2", "L3 + R3", "Share + Options", "None (Insert only)"};
+        ChoiceRow("Menu shortcut", s.menu_combo, combo_labels, nullptr, 4,
+                  "Controller buttons that open this menu.");
         CheckRow("Tips at startup", s.quick_menu_hint,
                  "A short note when the game starts: the OWL (hold Delete and move the mouse) and the quick menu.");
         ImGui::EndTable();
@@ -761,6 +767,14 @@ void PerformanceTab() {
             std::snprintf(text, sizeof(text), "%d FPS (engine frame rate)", effective);
             InfoRow("Effective limit", text);
         }
+        // gow3: a vblank-paced session (launcher 30 / 60) cannot go above 60 live.
+        static const bool vblank_paced = [] {
+            const char* v = std::getenv("GOW3_VBLANK_HZ");
+            return !v || std::atoi(v) > 0;
+        }();
+        if (!game_patches && vblank_paced && (s.fps_limit == 0 || s.fps_limit > 60)) {
+            InfoRow("Effective limit", "60 FPS: choose 144 / 240 / Unlimited in the launcher");
+        }
         if (game_patches && s.applied_engine_fps < s.startup_engine_fps) {
             InfoRow("Engine frame rate", "60 FPS: the frame rate patch is not available for this game build");
         }
@@ -955,6 +969,20 @@ void QuickMenu() {
 // quick menu shortcut. Fades out.
 constexpr float HintSeconds = 10.0f;
 
+// " / R3+L2" for the heading: the controller shortcut menu_combo sets, in this pad's names.
+std::string MenuComboText() {
+    switch (Gow3Settings::Get().menu_combo.load()) {
+    case 0:
+        return PadText(" / R3+L2", " / RS+LT", " / RS+ZL");
+    case 1:
+        return PadText(" / L3+R3", " / LS+RS", " / LS+RS");
+    case 2:
+        return PadText(" / Share+Options", " / View+Menu", " / -+(+)");
+    default:
+        return "";
+    }
+}
+
 bool HintActive() {
     const auto& s = Gow3Settings::Get();
     return !hint_done.load() && s.quick_menu_hint.load() && !loading.load();
@@ -1011,9 +1039,10 @@ void Menu() {
     // gow3: the game's own title (param.sfo), not a fixed one.
     static const std::string heading = [] {
         const std::string_view title = Common::ElfInfo::Instance().Title();
-        return std::string(title.empty() ? "God of War III" : title) + PadText("  (Insert / R3+L2)", "  (Insert / RS+LT)", "  (Insert / RS+ZL)");
+        return std::string(title.empty() ? "God of War III" : title);
     }();
-    if (!ImGui::Begin(heading.c_str(), &keep_open, ImGuiWindowFlags_NoCollapse)) {
+    const std::string heading_text = heading + "  (Insert" + MenuComboText() + ")###menu";
+    if (!ImGui::Begin(heading_text.c_str(), &keep_open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
@@ -1576,10 +1605,23 @@ bool HandleEvent(const SDL_Event& event) {
     case SDL_EVENT_GAMEPAD_BUTTON_UP: {
         const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
         const u8 button = event.gbutton.button;
-        // R3+L2 opens the menu: L3+R3 is a game action in God of War III.
-        if (button == SDL_GAMEPAD_BUTTON_RIGHT_STICK) {
-            r3_down = down;
-            if (down && l2_down) {
+        // R3+L2 by default (L3+R3 is a game action in God of War III); menu_combo picks another.
+        const int combo = Gow3Settings::Get().menu_combo.load();
+        bool* held = button == SDL_GAMEPAD_BUTTON_RIGHT_STICK ? &r3_down
+                     : button == SDL_GAMEPAD_BUTTON_LEFT_STICK ? &l3_down
+                     : button == SDL_GAMEPAD_BUTTON_BACK       ? &back_down
+                     : button == SDL_GAMEPAD_BUTTON_START      ? &start_down
+                                                               : nullptr;
+        if (held) {
+            const bool was = *held;
+            *held = down;
+            const bool pressed = down && !was;
+            const bool r3_l2 = combo == 0 && button == SDL_GAMEPAD_BUTTON_RIGHT_STICK && l2_down;
+            const bool l3_r3 = combo == 1 && l3_down && r3_down &&
+                               (button == SDL_GAMEPAD_BUTTON_LEFT_STICK || button == SDL_GAMEPAD_BUTTON_RIGHT_STICK);
+            const bool back_start = combo == 2 && back_down && start_down &&
+                                    (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_START);
+            if (pressed && (r3_l2 || l3_r3 || back_start)) {
                 toggle_menu();
                 return true;
             }
@@ -1595,7 +1637,7 @@ bool HandleEvent(const SDL_Event& event) {
     case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
         if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER) {
             const bool down = event.gaxis.value > 16000;
-            if (down && !l2_down && r3_down) {
+            if (down && !l2_down && r3_down && Gow3Settings::Get().menu_combo.load() == 0) {
                 l2_down = true;
                 toggle_menu();
                 return true;

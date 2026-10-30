@@ -1197,6 +1197,15 @@ def launch_online_game(settings, graphics, online):
     for name in ('launcher.json', 'settings.ini'):
         if (USER_DIR / name).is_file():
             shutil.copyfile(USER_DIR / name, user / name)
+    # The full scene at the game's own size and anti-aliasing: with an upscaler quality mode the
+    # respawn menu drew its 3D background at the reduced size in a corner (gameplay was fine).
+    options = json.loads((user / 'launcher.json').read_text(encoding='utf-8')) if (user / 'launcher.json').is_file() else {}
+    options['upscale_quality'] = 'native'
+    (user / 'launcher.json').write_text(json.dumps(options, indent=2), encoding='utf-8')
+    if (user / 'settings.ini').is_file():
+        ini = [line for line in (user / 'settings.ini').read_text(encoding='utf-8').splitlines()
+               if not line.startswith('upscale_quality=')]
+        (user / 'settings.ini').write_text('\n'.join(ini + ['upscale_quality=native']) + '\n', encoding='utf-8')
     env = dict(os.environ, KZSF_USER_DIR=str(user), **room_env)
     command = [sys.executable, '--play'] if FROZEN else [sys.executable, str(Path(__file__).resolve()), '--play']
     return subprocess.Popen(command, cwd=str(PORT_DIR), env=env, stdin=subprocess.DEVNULL), user / 'logs'

@@ -294,7 +294,7 @@ join the same Radmin network; the page shows **"Radmin VPN connected"** when it'
 > quality modes are campaign-only for now), and the new profile takes the
 > language chosen in *Advanced → Game*. The host's launcher must stay open while you play.
 
-Based on a community member's private multiplayer prototype (see [Credits](#-credits--créditos)).
+Based on **Marakesch**'s private multiplayer prototype (see [Credits](#-credits--créditos)).
 
 ### 🧰 Launcher
 
@@ -689,7 +689,7 @@ a la misma red de Radmin; la página muestra **"Radmin VPN conectado"** cuando e
 > perfil nuevo toma el idioma elegido en *Avanzado → Juego*. El launcher del host tiene que quedar
 > abierto mientras juegan.
 
-Basado en el prototipo de multijugador privado de un miembro de la comunidad (ver [Créditos](#-credits--créditos)).
+Basado en el prototipo de multijugador privado de **Marakesch** (ver [Créditos](#-credits--créditos)).
 
 ### 🧰 Launcher
 
@@ -807,7 +807,7 @@ compilá antes el puente con Visual Studio 2022 y el [SDK de NVIDIA DLSS](https:
   suggestions and the controller quick menu idea (#49).
 - **pearlxcore**: [KillzoneShadowFall-PC](https://github.com/pearlxcore/KillzoneShadowFall-PC), whose
   free camera math, Tactical Echo patch, effect toggles and god mode damage skip were adapted here.
-- **KZSF private multiplayer prototype** (community member, GPL-2.0-or-later, built on this port's
+- **Marakesch**: the KZSF private multiplayer prototype (GPL-2.0-or-later, built on this port's
   0.6.0): network and PSN adapters, room server, profile service and multiplayer patches, the base
   of the multiplayer beta (moved to Radmin VPN and the launcher here).
 - **AMD FidelityFX FSR 3.1** ([FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan)), **AMD FSR 4**

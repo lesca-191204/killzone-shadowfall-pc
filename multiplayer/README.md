@@ -3,7 +3,7 @@
 Multiplayer between friends without the official servers: one PC hosts a room and the others
 join it over a virtual LAN (Radmin VPN, Tailscale, ZeroTier or a home network).
 
-Based on the **KZSF private multiplayer prototype** (community, GPL-2.0-or-later, built on this
+Based on the **KZSF private multiplayer prototype** by **Marakesch** (GPL-2.0-or-later, built on this
 port's v0.6.0 and shared with us on 2026-10-30). From it: the native network/PSN adapters
 (`src/runtime_network.c`, `runtime_http.c`, `runtime_rudp.c`, `runtime_np_webapi.c`, the
 identity part of `runtime_services.c`), the room server, bridge and profile services

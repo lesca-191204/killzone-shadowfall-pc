@@ -17,9 +17,8 @@ Native Windows port of **Killzone Shadow Fall** (PS4). The game's code runs dire
 graphics are translated to Vulkan in real time. **Public beta:** the whole campaign is playable,
 and it keeps improving with every report.
 
-> 🆕 **0.7.0:** 🛡️ **god mode without hit effects** · 🚀 **faster GPU threads** (+38% draws/s) ·
-> 🌍 **game language option** · ⌨️ **remappable movement keys and touchpad swipes** · ⏱️ **live FPS
-> limit and smoother pacing** · 🛠️ **25 issues fixed** (long folder paths, AMD FSR 3.1, cutscene upscaling, old CPUs, updates).
+> 🆕 **0.8.0:** 🌐 **multiplayer is back (beta)**: play with your friends over Radmin VPN, without the
+> official servers · 🧭 new **Multiplayer** page in the launcher · 🏅 everything unlocked in multiplayer.
 
 > ⚠️ **No game files are included.** You need your own dumped copy of the game, **version 01.81**:
 > **CUSA00190** (the tested one) or another region (see [Game versions](#-game-versions)). This
@@ -273,6 +272,29 @@ the game.
 
 The player stands still while the camera flies. 📸 Great for screenshots (**F12**).
 
+### 🌐 Multiplayer (beta)
+
+*Launcher → **Multiplayer (BETA)** (also a tab in the classic launcher)*
+
+Play with your friends without the official servers: one PC creates a **room**, the others join it
+over a virtual LAN. Install **[Radmin VPN](https://www.radmin-vpn.com/)** (free) on every PC and
+join the same Radmin network; the page shows **"Radmin VPN connected"** when it's ready.
+
+1. **Host:** nickname → **Create room** → send the others the **room code** and the **connection
+   file** (*Save connection file…*, `Host-connection.zip`, no secrets in it). Allow the firewall on
+   private networks if Windows asks.
+2. **Others:** nickname → choose the connection file → type the code → **Join**.
+3. **Everyone:** **Play in the room (multiplayer)**. In the game one player creates the Warzone
+   (*Multiplayer → Create your Warzone*), the others join it (*Browse Warzones*).
+
+> 💾 **Two PLAY buttons, two saves.** **PLAY** opens the campaign with your save. **PLAY IN THE
+> ROOM** uses a save of its own and starts at the main menu without campaign progress: your campaign
+> was not touched. In multiplayer everything is unlocked (max rank, weapons, abilities, challenges),
+> the game renders at full resolution with its own anti-aliasing, and the new profile takes the
+> language chosen in *Advanced → Game*. The host's launcher must stay open while you play.
+
+Based on a community member's private multiplayer prototype (see [Credits](#-credits--créditos)).
+
 ### 🧰 Launcher
 
 **New in 0.5.0:** a launcher redesigned from scratch, with **every option clearer**.
@@ -328,15 +350,17 @@ Reports (distro or Steam Deck, Proton version, GPU) are welcome on Discord or in
 - **Ultrawide (beta):** some 3D HUD markers can look slightly shifted; video sides may show the last frame.
 - **Above 60 FPS (experimental):** turn VSync off on a 60 Hz monitor.
 - The shader cache can take several GB ("Clear cache" in the launcher).
-- Multiplayer: offline only (Botzone).
+- **Multiplayer (beta):** tested between game copies on one PC; matches with many PCs not tested yet.
+  Don't switch teams mid-match.
 
 ## 🗺️ Roadmap
 
-**✅ Done in 0.7.0:** 🛡️ god mode without hit effects · 🚀 faster GPU threads · 🌍 game language ·
+**✅ Done in 0.8.0:** 🌐 multiplayer (beta) over Radmin VPN · 🧭 Multiplayer page in both launchers.
+**0.7.0:** 🛡️ god mode without hit effects · 🚀 faster GPU threads · 🌍 game language ·
 ⌨️ remappable movement and swipes · ⏱️ live FPS limit and pacing · 🛠️ 25 issues fixed.
 
 **🔜 Coming next:** the port is nearly complete in features, so the focus now is
-- 📦 **DLC support** (#4 / #15): the multiplayer map packs in offline Botzone.
+- 🌐 **Multiplayer:** fixes from your reports; 📦 **DLC map packs** (#4 / #15).
 - 🐞 **Stability and crashes**, above all on **Intel Arc** and **AMD** graphics.
 - 🧩 **Compatibility** with other regions and dumps, and the remaining issues.
 - 🌍 **More languages in the launcher.**
@@ -381,9 +405,8 @@ Port nativo para Windows de **Killzone Shadow Fall** (PS4). El código del juego
 en tu CPU; los gráficos se traducen a Vulkan en tiempo real. **Beta pública:** se puede jugar la
 campaña completa, y mejora con cada reporte.
 
-> 🆕 **0.7.0:** 🛡️ **modo dios sin efectos de golpe** · 🚀 **hilos de GPU más rápidos** (+38% de dibujos/s) ·
-> 🌍 **opción de idioma del juego** · ⌨️ **teclas de movimiento y deslizamientos del touchpad reasignables** ·
-> ⏱️ **límite de FPS en vivo y ritmo más parejo** · 🛠️ **25 issues corregidos** (rutas largas, FSR 3.1 en AMD, escalado en cinemáticas, CPUs viejos, actualizaciones).
+> 🆕 **0.8.0:** 🌐 **vuelve el multijugador (beta)**: jugá con tus amigos por Radmin VPN, sin los
+> servidores oficiales · 🧭 página nueva **Multijugador** en el launcher · 🏅 todo desbloqueado en multijugador.
 
 > ⚠️ **No incluye archivos del juego.** Necesitás tu propia copia dumpeada del juego, **versión
 > 01.81**: **CUSA00190** (la probada) u otra región (ver [Versiones del juego](#️-versiones-del-juego)).
@@ -642,6 +665,30 @@ que los desarrolladores dejaron en el juego.
 
 El jugador se queda quieto mientras la cámara vuela. 📸 Ideal para capturas (**F12**).
 
+### 🌐 Multijugador (beta)
+
+*Launcher → **Multijugador (BETA)** (también es una pestaña del launcher clásico)*
+
+Jugá con tus amigos sin los servidores oficiales: una PC crea una **sala** y las demás se unen por
+una red virtual. Instalá **[Radmin VPN](https://www.radmin-vpn.com/)** (gratis) en cada PC y únanse
+a la misma red de Radmin; la página muestra **"Radmin VPN conectado"** cuando está listo.
+
+1. **Host:** apodo → **Crear sala** → pasales a los demás el **código de sala** y el **archivo de
+   conexión** (*Guardar archivo de conexión…*, `Host-connection.zip`, no tiene nada secreto). Si
+   Windows pregunta por el firewall, permitilo en redes privadas.
+2. **Los demás:** apodo → elegí el archivo de conexión → poné el código → **Unirse**.
+3. **Todos:** **Jugar en la sala (multijugador)**. En el juego uno crea la Warzone (*Multiplayer →
+   Create your Warzone*) y los demás entran (*Browse Warzones*).
+
+> 💾 **Dos botones de JUGAR, dos partidas guardadas.** **JUGAR** abre la campaña con tu partida.
+> **JUGAR EN LA SALA** usa una partida aparte y arranca en el menú principal sin progreso de
+> campaña: tu campaña no se tocó. En multijugador está todo desbloqueado (rango máximo, armas,
+> habilidades, desafíos), el juego se ve a resolución completa con su propio anti-aliasing y el
+> perfil nuevo toma el idioma elegido en *Avanzado → Juego*. El launcher del host tiene que quedar
+> abierto mientras juegan.
+
+Basado en el prototipo de multijugador privado de un miembro de la comunidad (ver [Créditos](#-credits--créditos)).
+
 ### 🧰 Launcher
 
 **Nuevo en 0.5.0:** un launcher rediseñado desde cero, con **todas las opciones más claras**.
@@ -700,16 +747,18 @@ Linux (AppImage).
   pueden mostrar el último cuadro.
 - **Más de 60 FPS (experimental):** con un monitor de 60 Hz desactivá VSync.
 - La caché de shaders puede ocupar varios GB ("Borrar caché" en el launcher).
-- Multijugador: solo sin conexión (Botzone).
+- **Multijugador (beta):** probado entre copias del juego en una PC; partidas con muchas PCs sin probar.
+  No cambien de equipo en mitad de la partida.
 
 ## 🗺️ Próximamente
 
-**✅ Hecho en 0.7.0:** 🛡️ modo dios sin efectos de golpe · 🚀 hilos de GPU más rápidos · 🌍 idioma
+**✅ Hecho en 0.8.0:** 🌐 multijugador (beta) por Radmin VPN · 🧭 página Multijugador en los dos launchers.
+**0.7.0:** 🛡️ modo dios sin efectos de golpe · 🚀 hilos de GPU más rápidos · 🌍 idioma
 del juego · ⌨️ movimiento y deslizamientos reasignables · ⏱️ límite de FPS en vivo y ritmo · 🛠️ 25
 issues corregidos.
 
 **🔜 Lo que viene:** el port ya está casi completo en funciones, así que ahora el foco es
-- 📦 **Soporte de DLC** (#4 / #15): los packs de mapas multijugador en el Botzone sin conexión.
+- 🌐 **Multijugador:** correcciones de lo que reporten; 📦 **packs de mapas del DLC** (#4 / #15).
 - 🐞 **Estabilidad y crashes**, sobre todo en gráficas **Intel Arc** y **AMD**.
 - 🧩 **Compatibilidad** con otras regiones y dumps, y los issues que quedan.
 - 🌍 **Más idiomas en el launcher.**
@@ -756,6 +805,9 @@ compilá antes el puente con Visual Studio 2022 y el [SDK de NVIDIA DLSS](https:
   suggestions and the controller quick menu idea (#49).
 - **pearlxcore**: [KillzoneShadowFall-PC](https://github.com/pearlxcore/KillzoneShadowFall-PC), whose
   free camera math, Tactical Echo patch, effect toggles and god mode damage skip were adapted here.
+- **KZSF private multiplayer prototype** (community member, GPL-2.0-or-later, built on this port's
+  0.6.0): network and PSN adapters, room server, profile service and multiplayer patches, the base
+  of the multiplayer beta (moved to Radmin VPN and the launcher here).
 - **AMD FidelityFX FSR 3.1** ([FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan)), **AMD FSR 4**
   (v07 INT8 shaders from [FireBurn/Q2RTX](https://github.com/FireBurn/Q2RTX), MIT) and **NVIDIA
   DLSS** ([DLSS SDK](https://github.com/NVIDIA/DLSS); NVIDIA's license is in `licenses\`).

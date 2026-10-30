@@ -38,6 +38,40 @@ from player_identity import player_number, validate_nickname  # noqa: E402
 
 PATCHES = 'Private Multiplayer - HUD Visibility;Private Multiplayer - Full Unlocks;Private Multiplayer - Full Width'
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+_JOB = None
+
+
+def tie_to_this_process(process):
+    """Windows: the room server and bridge end with this process, however it ends (a launcher
+    closed from the task manager left a room server holding TCP 17803). A job object that kills
+    its processes when its last handle closes; the handle is never closed here."""
+    global _JOB
+    if os.name != 'nt':
+        return
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    if _JOB is None:
+        class Basic(ctypes.Structure):
+            _fields_ = [('PerProcessUserTimeLimit', ctypes.c_int64), ('PerJobUserTimeLimit', ctypes.c_int64),
+                        ('LimitFlags', wintypes.DWORD), ('MinimumWorkingSetSize', ctypes.c_size_t),
+                        ('MaximumWorkingSetSize', ctypes.c_size_t), ('ActiveProcessLimit', wintypes.DWORD),
+                        ('Affinity', ctypes.c_size_t), ('PriorityClass', wintypes.DWORD),
+                        ('SchedulingClass', wintypes.DWORD)]
+
+        class Extended(ctypes.Structure):
+            _fields_ = [('Basic', Basic), ('Io', ctypes.c_uint64 * 6), ('ProcessMemoryLimit', ctypes.c_size_t),
+                        ('JobMemoryLimit', ctypes.c_size_t), ('PeakProcessMemoryUsed', ctypes.c_size_t),
+                        ('PeakJobMemoryUsed', ctypes.c_size_t)]
+        kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        job = kernel.CreateJobObjectW(None, None)
+        info = Extended()
+        info.Basic.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not job or not kernel.SetInformationJobObject(wintypes.HANDLE(job), 9, ctypes.byref(info),
+                                                         ctypes.sizeof(info)):
+            return
+        _JOB = job
+    kernel.AssignProcessToJobObject(wintypes.HANDLE(_JOB), wintypes.HANDLE(int(process._handle)))
 
 
 def network():
@@ -87,6 +121,7 @@ class Online:
         bridge = subprocess.Popen(command, cwd=str(HERE), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   stderr=subprocess.DEVNULL, text=True, encoding='utf-8',
                                   env=self._environment(), creationflags=NO_WINDOW)
+        tie_to_this_process(bridge)
         line = bridge.stdout.readline(8193)
         try:
             message = json.loads(line)
@@ -117,6 +152,7 @@ class Online:
                                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                         stderr=subprocess.DEVNULL, env=self._environment(),
                                         creationflags=NO_WINDOW)
+        tie_to_this_process(self.gateway)
         try:
             if not wait_port(identity.ipv4, room_host.PORT):
                 raise ValueError('The room server did not start (is TCP 17803 in use?)')

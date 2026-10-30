@@ -1320,7 +1320,7 @@ static const RuntimeExport exports[]={
 };
 uintptr_t runtime_services_resolve(const char *name) {
     const char *trace=getenv("KZSF_NET_TRACE");
-    if (!trace || strcmp(trace,"0")) {
+    if (trace && !strcmp(trace,"1")) { /* opt-in: the campaign log stays clean */
         uintptr_t wrapper=RUNTIME_LOOKUP(trace_exports,name);
         if (wrapper) return wrapper;
     }

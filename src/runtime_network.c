@@ -55,7 +55,7 @@ static int udp_error(void) {
 static int64_t udp_fail(int error) { *runtime_errno()=error; return -1; }
 static int64_t udp_trace(const char *name,int fd,int64_t result) {
     const char *enabled=getenv("KZSF_NET_TRACE");
-    if (!enabled || strcmp(enabled,"0"))
+    if (enabled && !strcmp(enabled,"1")) /* opt-in: the campaign log stays clean */
         fprintf(stderr,"NETTRACE %s fd=%d result=%lld errno=%d\n",name,fd,(long long)result,result<0 ? *runtime_errno() : 0);
     return result;
 }

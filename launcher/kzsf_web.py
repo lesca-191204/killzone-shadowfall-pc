@@ -688,15 +688,7 @@ class Api:
     # -- multiplayer (beta) -------------------------------------------------------------------
 
     def _kz_online(self):
-        """multiplayer/kz_online.py (the private multiplayer prototype's room services); None when
-        the port has no multiplayer folder."""
-        folder = self._core.PORT_DIR / 'multiplayer'
-        if not (folder / 'kz_online.py').is_file():
-            return None
-        if str(folder) not in sys.path:
-            sys.path.insert(0, str(folder))
-        import kz_online
-        return kz_online
+        return self._core.online_module()
 
     def _room_view(self):
         online = self._online
@@ -780,36 +772,23 @@ class Api:
         return self.online_info()
 
     def online_play(self):
-        """The game in the room: the launcher's own --play with a user folder of its own (user/online/
-        game: saves apart from the campaign; options and shader cache from this one)."""
+        """The game in the room (kzsf_launcher.launch_online_game: saves apart from the campaign)."""
         c = self._core
         if self._process is not None or self._updating:
             return {}
         ok, message, _ = c.check_game(self._settings['game_dir'], self._settings['update_dir'])
         if not ok:
             return {'error': f"{message}\n\n{self._t('fix_folder')}", 'page': 'home'}
-        try:
-            room_env = self._online.game_env(c.PS4_DIR) if self._online else None
-        except ValueError:
-            room_env = None
-        if not room_env:
+        if not self._online:
             return {'error': self._t('online_closed')}
-        c.save_graphics(self._graphics)
-        c.save_launcher(self._settings)
-        user = c.USER_DIR / 'online' / 'game'
-        user.mkdir(parents=True, exist_ok=True)
-        import shutil
-        for name in ('launcher.json', 'settings.ini'):
-            if (c.USER_DIR / name).is_file():
-                shutil.copyfile(c.USER_DIR / name, user / name)
-        env = dict(os.environ, KZSF_USER_DIR=str(user), **room_env)
-        command = [sys.executable, '--play'] if c.FROZEN else [sys.executable, str(Path(c.__file__).resolve()), '--play']
         try:
-            self._process = subprocess.Popen(command, cwd=str(c.PORT_DIR), env=env, stdin=subprocess.DEVNULL)
+            self._process, self._run_dir = c.launch_online_game(self._settings, self._graphics, self._online)
+        except ValueError:
+            self._process = None
+            return {'error': self._t('online_closed')}
         except OSError as error:
             self._process = None
             return {'error': c.tr('cant_start', error=error)}
-        self._run_dir = user / 'logs'
 
         def wait(process):
             process.wait()

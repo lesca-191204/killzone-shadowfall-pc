@@ -35,6 +35,30 @@ WEB_TEXTS = {
         'grp_face': 'Botones', 'grp_shoulders': 'Gatillos y sticks', 'grp_menu': 'Menú y touchpad',
         'grp_dpad': 'Cruceta · adrenalina, eco táctico, modo de disparo',
         'grp_move': 'Movimiento (stick izquierdo)', 'grp_swipe': 'Deslizar en el touchpad · órdenes del OWL',
+        # Multiplayer (beta) page.
+        'tab_online': 'Multijugador', 'online_beta': 'BETA',
+        'online_warning': 'Beta de prueba: multijugador privado entre amigos, sin servidores oficiales. Una PC crea la sala y las demás se unen por una red virtual (Radmin VPN). Los errores, por issues de GitHub con la carpeta del log.',
+        'online_network': 'Red virtual', 'online_refresh': 'Actualizar',
+        'online_net_radmin': 'Radmin VPN conectado · {ip}', 'online_net_tailscale': 'Tailscale conectado · {ip}',
+        'online_net_lan': 'Sin Radmin VPN: solo red local · {ip}', 'online_net_none': 'Sin red virtual',
+        'online_net_help': 'Instalá Radmin VPN (gratis). El host crea una red (Red → Crear red) y los demás se unen con su nombre y contraseña. Todos tienen que verse en la lista de Radmin. Tailscale y una red de casa también sirven.',
+        'online_get_radmin': 'Descargar Radmin VPN',
+        'online_nickname': 'Tu apodo', 'online_nickname_help': 'De 3 a 16 letras, números, _ o -. Distinto para cada jugador de la sala.',
+        'online_host': 'Crear sala', 'online_host_help': 'Esta PC es el servidor de la sala: tiene que quedar abierta mientras juegan. Si Windows pregunta por el firewall, permitilo en redes privadas.',
+        'online_host_button': 'Crear sala',
+        'online_join': 'Unirse a una sala', 'online_join_help': 'El host te pasa su archivo de conexión (Host-connection.zip, no tiene nada secreto) y el código de la sala.',
+        'online_connection': 'Archivo de conexión', 'online_choose': 'Elegir…', 'online_code': 'Código de sala',
+        'online_join_button': 'Unirse',
+        'online_room': 'Sala', 'online_you_host': 'Sos el host · {nickname}', 'online_you_join': 'Estás en la sala · {nickname}',
+        'online_copy': 'Copiar', 'online_copied': 'Código copiado',
+        'online_save_connection': 'Guardar archivo de conexión…', 'online_saved': 'Archivo guardado',
+        'online_send': 'Mandales a los demás el código y el archivo de conexión.',
+        'online_play': 'Jugar en la sala (multijugador)', 'online_close': 'Cerrar la sala', 'online_leave': 'Salir de la sala',
+        'online_working': 'Abriendo la sala…', 'online_closed': 'La sala se cerró.',
+        'online_steps': 'En el juego', 'online_steps_help': 'Uno crea la Warzone: Multiplayer → Create your Warzone → elegí al menos un mapa y un nombre. Los demás: Multiplayer → Browse Warzones → esa Warzone → Join. No cambien de equipo en mitad de la partida. Tus partidas del multijugador se guardan aparte de la campaña.',
+        'online_missing': 'Falta la carpeta multiplayer del port: volvé a descargar el port.',
+        'online_saves': 'Dos botones de jugar, dos partidas guardadas',
+        'online_saves_help': 'JUGAR (abajo) abre la campaña con tu partida de siempre. JUGAR EN LA SALA abre el multijugador con una partida guardada aparte: el juego arranca en el menú principal sin tu progreso de campaña. Es normal: tu partida de la campaña no se borró ni se tocó, la vas a ver de nuevo con JUGAR. En multijugador el rango, las armas y los desafíos vienen todos desbloqueados. El perfil nuevo toma el idioma de Avanzado → Juego → Idioma del juego. En multijugador el juego se ve a resolución completa con su propio anti-aliasing (los modos de calidad del escalado son para la campaña).',
         'more': 'Ver más', 'less': 'Ver menos', 'cancel': 'Cancelar', 'ok': 'Aceptar', 'yes': 'Sí',
         'open_logs_q': 'Abrir logs', 'close': 'Cerrar', 'game_status': 'Estado',
         'home_sub': 'Port nativo para Windows', 'quick_links': 'Accesos rápidos',
@@ -66,6 +90,29 @@ WEB_TEXTS = {
         'grp_face': 'Buttons', 'grp_shoulders': 'Triggers and sticks', 'grp_menu': 'Menu and touchpad',
         'grp_dpad': 'D-pad · adrenaline, tactical echo, fire mode',
         'grp_move': 'Movement (left stick)', 'grp_swipe': 'Touchpad swipes · OWL commands',
+        'tab_online': 'Multiplayer', 'online_beta': 'BETA',
+        'online_warning': 'Testing beta: private multiplayer between friends, without the official servers. One PC creates the room and the others join it over a virtual LAN (Radmin VPN). Report bugs in GitHub issues with the log folder.',
+        'online_network': 'Virtual LAN', 'online_refresh': 'Refresh',
+        'online_net_radmin': 'Radmin VPN connected · {ip}', 'online_net_tailscale': 'Tailscale connected · {ip}',
+        'online_net_lan': 'No Radmin VPN: home network only · {ip}', 'online_net_none': 'No virtual LAN',
+        'online_net_help': "Install Radmin VPN (free). The host creates a network (Network → Create network) and the others join it with its name and password. Everyone must see each other in Radmin's list. Tailscale and a home network work too.",
+        'online_get_radmin': 'Download Radmin VPN',
+        'online_nickname': 'Your nickname', 'online_nickname_help': '3 to 16 letters, digits, _ or -. A different one for each player in the room.',
+        'online_host': 'Create a room', 'online_host_help': "This PC is the room's server: keep it open while you play. If Windows asks about the firewall, allow private networks.",
+        'online_host_button': 'Create room',
+        'online_join': 'Join a room', 'online_join_help': 'The host sends you their connection file (Host-connection.zip, it has no secrets) and the room code.',
+        'online_connection': 'Connection file', 'online_choose': 'Choose…', 'online_code': 'Room code',
+        'online_join_button': 'Join',
+        'online_room': 'Room', 'online_you_host': 'You are the host · {nickname}', 'online_you_join': 'You are in the room · {nickname}',
+        'online_copy': 'Copy', 'online_copied': 'Code copied',
+        'online_save_connection': 'Save connection file…', 'online_saved': 'File saved',
+        'online_send': 'Send the others the code and the connection file.',
+        'online_play': 'Play in the room (multiplayer)', 'online_close': 'Close the room', 'online_leave': 'Leave the room',
+        'online_working': 'Opening the room…', 'online_closed': 'The room closed.',
+        'online_steps': 'In the game', 'online_steps_help': 'One player creates the Warzone: Multiplayer → Create your Warzone → pick at least one map and a name. The others: Multiplayer → Browse Warzones → that Warzone → Join. Do not switch teams mid-match. Your multiplayer saves are kept apart from the campaign.',
+        'online_missing': "The port's multiplayer folder is missing: download the port again.",
+        'online_saves': 'Two play buttons, two saves',
+        'online_saves_help': 'PLAY (at the bottom) opens the campaign with your usual save. PLAY IN THE ROOM opens multiplayer with a save of its own: the game starts at the main menu without your campaign progress. That is expected: your campaign save was not deleted or touched, PLAY shows it again. In multiplayer the rank, weapons and challenges are all unlocked. The new profile takes the language from Advanced → Game → Game language. In multiplayer the game renders at full resolution with its own anti-aliasing (the upscaling quality modes are for the campaign).',
         'more': 'More', 'less': 'Less', 'cancel': 'Cancel', 'ok': 'OK', 'yes': 'Yes',
         'open_logs_q': 'Open logs', 'close': 'Close', 'game_status': 'Status',
         'home_sub': 'Native Windows port', 'quick_links': 'Shortcuts',
@@ -127,6 +174,9 @@ class Api:
         self._update = None
         self._updating = False
         self._fsr4_busy = False
+        self._online = None  # multiplayer/kz_online.Online, once the Multiplayer page is used
+        self._online_busy = False
+        self._connection = ''
 
     # -- texts and pages ----------------------------------------------------------------------
 
@@ -287,7 +337,8 @@ class Api:
             ]},
         ]}
         home = {'id': 'home', 'icon': 'home', 'title': t('nav_home'), 'type': 'home'}
-        return [home, graphics, controls, cheats, advanced]
+        online = {'id': 'online', 'icon': 'users', 'title': t('tab_online'), 'type': 'online', 'badge': t('online_beta')}
+        return [home, graphics, controls, cheats, online, advanced]
 
     def _texts(self):
         t = self._t
@@ -364,7 +415,8 @@ class Api:
                 'icon': self._art('icon0.png', 128), 'key_map': self._settings['key_map'],
                 'pad_map': self._settings['pad_map'], 'playing': self._process is not None,
                 'fsr4_ready': not self._core.kzsf_fsr4.missing(c.FSR4_DIR),
-                'update': self._update_view(), 'reserved': sorted(c.RESERVED_KEYS)}
+                'update': self._update_view(), 'reserved': sorted(c.RESERVED_KEYS),
+                'online': self.online_info()}
 
     # -- options ------------------------------------------------------------------------------
 
@@ -486,7 +538,7 @@ class Api:
 
     def open_url(self, name):
         c = self._core
-        url = {'donate': c.DONATE_URL, 'discord': c.DISCORD_URL,
+        url = {'donate': c.DONATE_URL, 'discord': c.DISCORD_URL, 'radmin': 'https://www.radmin-vpn.com/',
                'notes': (self._update or {}).get('page')}.get(name)
         if url:
             webbrowser.open(url)
@@ -633,6 +685,119 @@ class Api:
         if code not in (0, None):
             self._emit('message', {'text': c.game_ended_text(code, self._run_dir), 'level': 'error', 'logs': True})
 
+    # -- multiplayer (beta) -------------------------------------------------------------------
+
+    def _kz_online(self):
+        return self._core.online_module()
+
+    def _room_view(self):
+        online = self._online
+        if not online or not online.alive():
+            return None
+        room = online.room
+        return {'code': room['code'], 'host': room['host'], 'nickname': room['nickname'], 'slot': room['slot']}
+
+    def online_info(self):
+        t = self._t
+        module = self._kz_online()
+        if module is None:
+            return {'missing': t('online_missing')}
+        net = module.network()
+        text = {'radmin': 'online_net_radmin', 'tailscale': 'online_net_tailscale',
+                'lan': 'online_net_lan'}.get(net['kind'], 'online_net_none')
+        return {'network': {'kind': net['kind'], 'text': t(text).replace('{ip}', net['ip'])},
+                'nickname': self._settings.get('online_nickname', ''), 'connection': self._connection,
+                'room': self._room_view(), 'busy': self._online_busy}
+
+    def _online_session(self):
+        if self._online is None:
+            self._online = self._kz_online().Online(self._core.USER_DIR / 'online')
+        return self._online
+
+    def _online_start(self, work):
+        """A room opens in the background (up to ~20 s): the page hears 'online' when it is done."""
+        if self._online_busy:
+            return
+        self._online_busy = True
+
+        def run():
+            error = None
+            try:
+                work(self._online_session())
+            except (OSError, ValueError, subprocess.SubprocessError) as e:
+                error = str(e)
+            self._online_busy = False
+            info = self.online_info()
+            if error:
+                info['error'] = error
+            self._emit('online', info)
+        threading.Thread(target=run, daemon=True).start()
+
+    def online_host(self, nickname):
+        self.set('online_nickname', nickname)
+        self._online_start(lambda online: online.host(nickname))
+        return self.online_info()
+
+    def online_join(self, code, nickname):
+        self.set('online_nickname', nickname)
+        if not self._connection:
+            return {**self.online_info(), 'error': self._t('online_join_help')}
+        self._online_start(lambda online: online.join(self._connection, code, nickname))
+        return self.online_info()
+
+    def online_choose_connection(self):
+        import webview
+        result = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False,
+                                                 file_types=('Host-connection (*.zip)', 'All files (*.*)'))
+        if result:
+            self._connection = str(result[0] if isinstance(result, (list, tuple)) else result)
+        return self.online_info()
+
+    def online_save_connection(self):
+        import shutil
+        import webview
+        online = self._online
+        if not online or not online.room or not online.room.get('archive'):
+            return {}
+        result = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename='Host-connection.zip')
+        if not result:
+            return {}
+        target = Path(result[0] if isinstance(result, (list, tuple)) else result)
+        shutil.copyfile(online.room['archive'], target)
+        return {'text': self._t('online_saved')}
+
+    def online_close(self):
+        if self._online:
+            self._online.close()
+        return self.online_info()
+
+    def online_play(self):
+        """The game in the room (kzsf_launcher.launch_online_game: saves apart from the campaign)."""
+        c = self._core
+        if self._process is not None or self._updating:
+            return {}
+        ok, message, _ = c.check_game(self._settings['game_dir'], self._settings['update_dir'])
+        if not ok:
+            return {'error': f"{message}\n\n{self._t('fix_folder')}", 'page': 'home'}
+        if not self._online:
+            return {'error': self._t('online_closed')}
+        try:
+            self._process, self._run_dir = c.launch_online_game(self._settings, self._graphics, self._online)
+        except ValueError:
+            self._process = None
+            return {'error': self._t('online_closed')}
+        except OSError as error:
+            self._process = None
+            return {'error': c.tr('cant_start', error=error)}
+
+        def wait(process):
+            process.wait()
+            self._process = None
+            self._emit('playing', {'playing': False})
+            self._emit('online', self.online_info())
+        threading.Thread(target=wait, args=(self._process,), daemon=True).start()
+        return {'playing': True}
+
     # -- page events --------------------------------------------------------------------------
 
     def _emit(self, kind, data):
@@ -719,6 +884,8 @@ def run(core):
     threading.Thread(target=watchdog, daemon=True).start()
     webview.start(gui='edgechromium', debug=bool(os.environ.get('KZSF_WEB_DEBUG')),
                   private_mode=True, icon=str(icon) if icon.is_file() else None)
+    if api._online:  # a room this window opened ends with it
+        api._online.close()
     return not blank.is_set()
 
 

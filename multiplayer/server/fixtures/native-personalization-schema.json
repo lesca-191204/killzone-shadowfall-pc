@@ -1,0 +1,15 @@
+{
+  "game_version": "01.81",
+  "eboot_sha256": "434e9ac17a2b31fd2e62e7b1f8e2df03b56ee49ca95c5685b0b74431290b2e9f",
+  "profile_type": "profile",
+  "fields": {
+    "cardID": {"native_name": "PlayerCardIconID", "type": "int32", "offset": "0x3e0", "rtti": "0x16a5438", "mode": 1},
+    "skinID": {"native_name": "AutomataSkinID", "type": "int", "offset": "0x3e4", "rtti": "0x16a5480", "mode": 1},
+    "ch_pack_ID": {"native_name": "CrosshairPackID", "type": "int", "offset": "0x3e8", "rtti": "0x16a54c8", "mode": 1},
+    "cps_ISA_ID": {"native_name": "ISAPlayerSkinID", "type": "int", "offset": "0x3ec", "rtti": "0x16a5510", "mode": 1},
+    "cps_HGH_ID": {"native_name": "HGHPlayerSkinID", "type": "int", "offset": "0x3f0", "rtti": "0x16a5558", "mode": 1},
+    "cvp_ena": {"native_name": "CustomVoicePacksEnabled", "type": "bool", "offset": "0x3f4", "rtti": "0x16a55a0", "mode": 1},
+    "cvp_ISA_ID": {"native_name": "ISAVoicePackID", "type": "int", "offset": "0x3f8", "rtti": "0x16a55e8", "mode": 1},
+    "cvp_HGH_ID": {"native_name": "HGHVoicePackID", "type": "int", "offset": "0x3fc", "rtti": "0x16a5630", "mode": 1}
+  }
+}

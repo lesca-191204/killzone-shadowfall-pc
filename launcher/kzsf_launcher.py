@@ -588,6 +588,16 @@ def attach_stdio():
             except OSError:
                 stream = None
         setattr(sys, name, stream or open(os.devnull, 'w'))
+    # A pipe from the parent (the multiplayer room bridge reads "stop" from it).
+    if sys.stdin is None:
+        handle = ctypes.windll.kernel32.GetStdHandle(-10)
+        stream = None
+        if handle and handle != ctypes.c_void_p(-1).value:
+            try:
+                stream = open(msvcrt.open_osfhandle(handle, os.O_RDONLY), 'r', encoding='utf-8', errors='replace')
+            except OSError:
+                stream = None
+        sys.stdin = stream or open(os.devnull)
 
 
 def run_role(argv):
@@ -600,6 +610,9 @@ def run_role(argv):
             pass
     if argv[0] == '--script':
         path, sys.argv = argv[1], argv[1:]
+        # As python does: the script's own folder first (the multiplayer room scripts import their
+        # neighbours).
+        sys.path.insert(0, str(Path(path).resolve().parent))
     else:
         path = str(PORT_DIR / 'run.py')
         sys.argv = [path, *argv[1:]]
@@ -1160,6 +1173,44 @@ def game_env(settings, graphics, needs_update):
     return env
 
 
+def online_module():
+    """multiplayer/kz_online.py (private multiplayer, beta: the room services); None when the port has
+    no multiplayer folder."""
+    folder = PORT_DIR / 'multiplayer'
+    if not (folder / 'kz_online.py').is_file():
+        return None
+    if str(folder) not in sys.path:
+        sys.path.insert(0, str(folder))
+    import kz_online
+    return kz_online
+
+
+def launch_online_game(settings, graphics, online):
+    """The game in a multiplayer room (both launcher windows): this launcher's own --play with a user
+    folder of its own (user/online/game: saves apart from the campaign; options and shader cache
+    from this one). (process, logs folder); ValueError when the room is closed, OSError."""
+    room_env = online.game_env(PS4_DIR)
+    save_graphics(graphics)
+    save_launcher(settings)
+    user = USER_DIR / 'online' / 'game'
+    user.mkdir(parents=True, exist_ok=True)
+    for name in ('launcher.json', 'settings.ini'):
+        if (USER_DIR / name).is_file():
+            shutil.copyfile(USER_DIR / name, user / name)
+    # The full scene at the game's own size and anti-aliasing: with an upscaler quality mode the
+    # respawn menu drew its 3D background at the reduced size in a corner (gameplay was fine).
+    options = json.loads((user / 'launcher.json').read_text(encoding='utf-8')) if (user / 'launcher.json').is_file() else {}
+    options['upscale_quality'] = 'native'
+    (user / 'launcher.json').write_text(json.dumps(options, indent=2), encoding='utf-8')
+    if (user / 'settings.ini').is_file():
+        ini = [line for line in (user / 'settings.ini').read_text(encoding='utf-8').splitlines()
+               if not line.startswith('upscale_quality=')]
+        (user / 'settings.ini').write_text('\n'.join(ini + ['upscale_quality=native']) + '\n', encoding='utf-8')
+    env = dict(os.environ, KZSF_USER_DIR=str(user), **room_env)
+    command = [sys.executable, '--play'] if FROZEN else [sys.executable, str(Path(__file__).resolve()), '--play']
+    return subprocess.Popen(command, cwd=str(PORT_DIR), env=env, stdin=subprocess.DEVNULL), user / 'logs'
+
+
 def launch_game(settings, graphics, needs_update):
     """Saves the options and starts the game: (process, game.log, errors.log, run folder); OSError."""
     save_graphics(graphics)
@@ -1279,6 +1330,7 @@ class Launcher:
         self.tabs = [('game', tr('tab_game'), self.game_tab), ('graphics', tr('tab_graphics'), self.graphics_tab),
                      ('controls', tr('tab_controls'), self.controls_tab),
                      ('cheats', tr('tab_cheats'), self.cheats_tab),
+                     ('online', self.ot('tab_online') + ' (beta)', self.online_tab),
                      ('advanced', tr('tab_advanced'), self.advanced_tab)]
         self.tab_labels = {}
         for key, title, _ in self.tabs:
@@ -1977,6 +2029,174 @@ class Launcher:
         self.tk.Label(frame, text='F9 / F10', bg=PANEL, fg=ACCENT, font=self.font(10, 'bold')).pack(side='left')
         self.note(parent, tr('free_camera_help'))
 
+    # -- multiplayer tab (beta) -------------------------------------------------------------
+
+    def ot(self, key):
+        """The Multiplayer texts are the new window's (kzsf_web.WEB_TEXTS)."""
+        import kzsf_web
+        texts = kzsf_web.WEB_TEXTS.get(LANG, kzsf_web.WEB_TEXTS['en'])
+        return texts.get(key, kzsf_web.WEB_TEXTS['en'].get(key, key))
+
+    def online_tab(self, parent):
+        module = online_module()
+        self.note(parent, self.ot('online_warning'), color=WARN)
+        if module is None:
+            self.note(parent, self.ot('online_missing'), color=ERROR)
+            return
+        if not hasattr(self, 'online'):
+            self.online, self.online_busy, self.online_connection = None, False, ''
+        net = module.network()
+        text = {'radmin': 'online_net_radmin', 'tailscale': 'online_net_tailscale',
+                'lan': 'online_net_lan'}.get(net['kind'], 'online_net_none')
+        self.heading(parent, self.ot('online_network'), pady=(14, 6))
+        frame = self.tk.Frame(parent, bg=PANEL)
+        frame.pack(fill='x')
+        self.tk.Label(frame, text=self.ot(text).replace('{ip}', net['ip']), bg=PANEL,
+                      fg=OK if net['kind'] in ('radmin', 'tailscale') else WARN if net['kind'] else ERROR,
+                      font=self.font(10, 'bold')).pack(side='left')
+        self.button(frame, self.ot('online_refresh'), lambda: self.show_tab('online')).pack(side='left', padx=self.px(12))
+        self.button(frame, self.ot('online_get_radmin'),
+                    lambda: webbrowser.open('https://www.radmin-vpn.com/')).pack(side='left')
+        self.note(parent, self.ot('online_net_help'))
+        room = self.online.room if self.online and self.online.alive() else None
+        if room:
+            self.heading(parent, self.ot('online_room'), pady=(18, 6))
+            frame = self.tk.Frame(parent, bg=PANEL)
+            frame.pack(fill='x')
+            self.tk.Label(frame, text=room['code'], bg=PANEL, fg=ACCENT, font=self.font(20, 'bold')).pack(side='left')
+
+            def copy():
+                self.root.clipboard_clear()
+                self.root.clipboard_append(room['code'])
+                self.status.configure(text=self.ot('online_copied'), fg=OK)
+            self.button(frame, self.ot('online_copy'), copy).pack(side='left', padx=self.px(14))
+            key = 'online_you_host' if room['host'] else 'online_you_join'
+            self.note(parent, self.ot(key).replace('{nickname}', room['nickname']))
+            if room['host']:
+                self.note(parent, self.ot('online_send'))
+
+                def save():
+                    target = self.filedialog.asksaveasfilename(parent=self.root, initialfile='Host-connection.zip',
+                                                               defaultextension='.zip')
+                    if target:
+                        shutil.copyfile(room['archive'], target)
+                        self.status.configure(text=self.ot('online_saved'), fg=OK)
+                self.button(parent, self.ot('online_save_connection'), save).pack(anchor='w', pady=self.px(6))
+            frame = self.tk.Frame(parent, bg=PANEL)
+            frame.pack(fill='x', pady=self.px(8))
+            self.button(frame, self.ot('online_play'), self.online_play, primary=True).pack(side='left')
+
+            def close():
+                self.online.close()
+                self.show_tab('online')
+            self.button(frame, self.ot('online_close' if room['host'] else 'online_leave'), close).pack(
+                side='left', padx=self.px(12))
+            self.heading(parent, self.ot('online_steps'), pady=(18, 6))
+            self.note(parent, self.ot('online_steps_help'))
+        else:
+            frame = self.row(parent, self.ot('online_nickname'))
+            nickname = self.tk.StringVar(value=self.settings.get('online_nickname', ''))
+            self.ttk.Entry(frame, textvariable=nickname, width=20).pack(side='left')
+            self.images.setdefault('vars', []).append(nickname)
+            self.note(parent, self.ot('online_nickname_help'))
+            busy = self.ot('online_working') if self.online_busy else None
+            self.heading(parent, self.ot('online_host'), pady=(18, 6))
+            self.note(parent, self.ot('online_host_help'))
+            self.button(parent, busy or self.ot('online_host_button'),
+                        lambda: self.online_start(nickname.get().strip(), None, None), primary=True).pack(
+                anchor='w', pady=self.px(6))
+            self.heading(parent, self.ot('online_join'), pady=(18, 6))
+            self.note(parent, self.ot('online_join_help'))
+            frame = self.row(parent, self.ot('online_connection'))
+            self.tk.Label(frame, text=self.online_connection or '-', bg=PANEL, fg=TEXT, font=self.font(9),
+                          anchor='w').pack(side='left')
+
+            def choose():
+                path = self.filedialog.askopenfilename(parent=self.root,
+                                                       filetypes=[('Host-connection', '*.zip'), ('*', '*.*')])
+                if path:
+                    self.online_connection = path
+                    self.show_tab('online')
+            self.button(frame, self.ot('online_choose'), choose).pack(side='left', padx=self.px(12))
+            frame = self.row(parent, self.ot('online_code'))
+            code = self.tk.StringVar()
+            self.ttk.Entry(frame, textvariable=code, width=14).pack(side='left')
+            self.images.setdefault('vars', []).append(code)
+            self.button(frame, busy or self.ot('online_join_button'),
+                        lambda: self.online_start(nickname.get().strip(), self.online_connection, code.get().strip()),
+                        primary=True).pack(side='left', padx=self.px(12))
+        self.heading(parent, self.ot('online_saves'), pady=(18, 6))
+        self.note(parent, self.ot('online_saves_help'))
+
+    def online_start(self, nickname, connection, code):
+        """Create (connection None) or join a room in the background; the tab redraws when done."""
+        if self.online_busy:
+            return
+        if connection is not None and not connection:
+            self.messagebox.showwarning('Killzone Shadow Fall', self.ot('online_join_help'), parent=self.root)
+            return
+        self.settings['online_nickname'] = nickname
+        save_launcher(self.settings)
+        if self.online is None:
+            self.online = online_module().Online(USER_DIR / 'online')
+        self.online_busy = True
+        self.show_tab('online')
+        result = {}
+
+        def work():
+            try:
+                if connection is None:
+                    self.online.host(nickname)
+                else:
+                    self.online.join(connection, code, nickname)
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                result['error'] = str(error)
+
+        def done():
+            self.online_busy = False
+            if result.get('error'):
+                self.messagebox.showerror('Killzone Shadow Fall', result['error'], parent=self.root)
+            if self.current_tab == 'online':
+                self.show_tab('online')
+        thread = threading.Thread(target=work, daemon=True)
+        thread.start()
+
+        def poll():
+            if thread.is_alive():
+                self.root.after(200, poll)
+            else:
+                done()
+        poll()
+
+    def online_play(self):
+        if self.process is not None or getattr(self, 'updating', False):
+            return
+        ok, message, _ = check_game(self.settings['game_dir'], self.settings['update_dir'])
+        if not ok:
+            self.messagebox.showwarning('Killzone Shadow Fall', f'{message}\n\n{tr("fix_folder")}', parent=self.root)
+            self.show_tab('game')
+            return
+        try:
+            self.process, _logs = launch_online_game(self.settings, self.graphics, self.online)
+        except (OSError, ValueError) as error:
+            self.process = None
+            self.messagebox.showerror('Killzone Shadow Fall', str(error) or self.ot('online_closed'), parent=self.root)
+            return
+        self.status.configure(text=tr('preparing'), fg=MUTED)
+        self.update_play_state()
+
+        def wait(process):
+            process.wait()
+            self.root.after(0, self.online_game_ended)
+        threading.Thread(target=wait, args=(self.process,), daemon=True).start()
+
+    def online_game_ended(self):
+        self.process = None
+        self.status.configure(text='', fg=MUTED)
+        self.update_play_state()
+        if self.current_tab == 'online':
+            self.show_tab('online')
+
     def advanced_tab(self, parent):
         self.note(parent, tr('advanced_help'), color=WARN)
         self.tk.Frame(parent, bg=PANEL, height=self.px(8)).pack()
@@ -2275,6 +2495,8 @@ def main():
     launcher = Launcher(root, tk, ttk, filedialog, messagebox)
     launcher.set_window_icon()
     root.mainloop()
+    if getattr(launcher, 'online', None):  # a room this window opened ends with it
+        launcher.online.close()
 
 
 if __name__ == '__main__':

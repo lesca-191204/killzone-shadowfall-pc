@@ -1,0 +1,272 @@
+{
+  "game_version": "01.81",
+  "eboot_sha256": "434e9ac17a2b31fd2e62e7b1f8e2df03b56ee49ca95c5685b0b74431290b2e9f",
+  "sources": {
+    "localcachepink/lumps/assets_description.application_application_assets.core": "5f70590fa183454ec447a45daeea766e6fd516258ebf6a6d99fc85483af961fc",
+    "localcachepink/lumps/assets_description.application_application_assets.core.patch": "33d65f4b94366b28052596d735f15fada6deea72f6cd6c8c8ad117798d4d6b80"
+  },
+  "patched_rttibin_sha256": "504a7e36d37aeebb11fe422d68a9c5f22204d9c426696b3d75cb7f737c795893",
+  "maximum_challenge_count": 2600,
+  "ranks": [
+    {
+      "title": "rank_01",
+      "challenge_count": 0,
+      "serialized_title_offset": "0x2019e2"
+    },
+    {
+      "title": "rank_02",
+      "challenge_count": 5,
+      "serialized_title_offset": "0x201a4b"
+    },
+    {
+      "title": "rank_03",
+      "challenge_count": 10,
+      "serialized_title_offset": "0x201ab4"
+    },
+    {
+      "title": "rank_04",
+      "challenge_count": 15,
+      "serialized_title_offset": "0x201b2d"
+    },
+    {
+      "title": "rank_05",
+      "challenge_count": 25,
+      "serialized_title_offset": "0x201baa"
+    },
+    {
+      "title": "rank_06",
+      "challenge_count": 50,
+      "serialized_title_offset": "0x201c07"
+    },
+    {
+      "title": "rank_07",
+      "challenge_count": 100,
+      "serialized_title_offset": "0x201ca8"
+    },
+    {
+      "title": "rank_08",
+      "challenge_count": 150,
+      "serialized_title_offset": "0x201d0d"
+    },
+    {
+      "title": "rank_09",
+      "challenge_count": 200,
+      "serialized_title_offset": "0x201d6a"
+    },
+    {
+      "title": "rank_10",
+      "challenge_count": 250,
+      "serialized_title_offset": "0x201dd3"
+    },
+    {
+      "title": "rank_11",
+      "challenge_count": 300,
+      "serialized_title_offset": "0x201e68"
+    },
+    {
+      "title": "rank_12",
+      "challenge_count": 350,
+      "serialized_title_offset": "0x201ee5"
+    },
+    {
+      "title": "rank_13",
+      "challenge_count": 400,
+      "serialized_title_offset": "0x201f52"
+    },
+    {
+      "title": "rank_14",
+      "challenge_count": 450,
+      "serialized_title_offset": "0x201fbf"
+    },
+    {
+      "title": "rank_15",
+      "challenge_count": 500,
+      "serialized_title_offset": "0x202028"
+    },
+    {
+      "title": "rank_16",
+      "challenge_count": 550,
+      "serialized_title_offset": "0x202085"
+    },
+    {
+      "title": "rank_17",
+      "challenge_count": 600,
+      "serialized_title_offset": "0x2020fe"
+    },
+    {
+      "title": "rank_18",
+      "challenge_count": 650,
+      "serialized_title_offset": "0x20215b"
+    },
+    {
+      "title": "rank_19",
+      "challenge_count": 700,
+      "serialized_title_offset": "0x2021b8"
+    },
+    {
+      "title": "rank_20",
+      "challenge_count": 750,
+      "serialized_title_offset": "0x202215"
+    },
+    {
+      "title": "rank_21",
+      "challenge_count": 800,
+      "serialized_title_offset": "0x202272"
+    },
+    {
+      "title": "rank_22",
+      "challenge_count": 850,
+      "serialized_title_offset": "0x2022df"
+    },
+    {
+      "title": "rank_23",
+      "challenge_count": 900,
+      "serialized_title_offset": "0x20233c"
+    },
+    {
+      "title": "rank_24",
+      "challenge_count": 950,
+      "serialized_title_offset": "0x202399"
+    },
+    {
+      "title": "rank_25",
+      "challenge_count": 1000,
+      "serialized_title_offset": "0x2023f6"
+    },
+    {
+      "title": "rank_26",
+      "challenge_count": 1050,
+      "serialized_title_offset": "0x202453"
+    },
+    {
+      "title": "rank_27",
+      "challenge_count": 1100,
+      "serialized_title_offset": "0x2024b0"
+    },
+    {
+      "title": "rank_28",
+      "challenge_count": 1150,
+      "serialized_title_offset": "0x20250d"
+    },
+    {
+      "title": "rank_29",
+      "challenge_count": 1200,
+      "serialized_title_offset": "0x20256b"
+    },
+    {
+      "title": "rank_30",
+      "challenge_count": 1250,
+      "serialized_title_offset": "0x2025c9"
+    },
+    {
+      "title": "rank_31",
+      "challenge_count": 1300,
+      "serialized_title_offset": "0x202627"
+    },
+    {
+      "title": "rank_32",
+      "challenge_count": 1350,
+      "serialized_title_offset": "0x202685"
+    },
+    {
+      "title": "rank_33",
+      "challenge_count": 1400,
+      "serialized_title_offset": "0x2026e3"
+    },
+    {
+      "title": "rank_34",
+      "challenge_count": 1450,
+      "serialized_title_offset": "0x202741"
+    },
+    {
+      "title": "rank_35",
+      "challenge_count": 1500,
+      "serialized_title_offset": "0x20279f"
+    },
+    {
+      "title": "rank_36",
+      "challenge_count": 1550,
+      "serialized_title_offset": "0x2027fd"
+    },
+    {
+      "title": "rank_37",
+      "challenge_count": 1600,
+      "serialized_title_offset": "0x20285b"
+    },
+    {
+      "title": "rank_38",
+      "challenge_count": 1650,
+      "serialized_title_offset": "0x2028b9"
+    },
+    {
+      "title": "rank_39",
+      "challenge_count": 1700,
+      "serialized_title_offset": "0x202917"
+    },
+    {
+      "title": "rank_40",
+      "challenge_count": 1750,
+      "serialized_title_offset": "0x202975"
+    },
+    {
+      "title": "rank_41",
+      "challenge_count": 1800,
+      "serialized_title_offset": "0x2029d3"
+    },
+    {
+      "title": "rank_42",
+      "challenge_count": 1850,
+      "serialized_title_offset": "0x202a31"
+    },
+    {
+      "title": "rank_43",
+      "challenge_count": 1900,
+      "serialized_title_offset": "0x202a8f"
+    },
+    {
+      "title": "rank_44",
+      "challenge_count": 1950,
+      "serialized_title_offset": "0x202aed"
+    },
+    {
+      "title": "rank_45",
+      "challenge_count": 2000,
+      "serialized_title_offset": "0x202b4b"
+    },
+    {
+      "title": "rank_46",
+      "challenge_count": 2050,
+      "serialized_title_offset": "0x202ba9"
+    },
+    {
+      "title": "rank_47",
+      "challenge_count": 2100,
+      "serialized_title_offset": "0x202c07"
+    },
+    {
+      "title": "rank_48",
+      "challenge_count": 2200,
+      "serialized_title_offset": "0x202c65"
+    },
+    {
+      "title": "rank_49",
+      "challenge_count": 2300,
+      "serialized_title_offset": "0x202cc3"
+    },
+    {
+      "title": "rank_50",
+      "challenge_count": 2400,
+      "serialized_title_offset": "0x202d21"
+    },
+    {
+      "title": "rank_51",
+      "challenge_count": 2500,
+      "serialized_title_offset": "0x202d7f"
+    },
+    {
+      "title": "rank_52",
+      "challenge_count": 2600,
+      "serialized_title_offset": "0x202ddd"
+    }
+  ]
+}

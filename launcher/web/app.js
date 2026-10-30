@@ -21,6 +21,7 @@ const ICONS = {
   heart: '<path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9Z"/>',
   chat: '<path d="M4 5h16v11H8l-4 4Z"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
 };
 
 function icon(name) {
@@ -295,6 +296,86 @@ document.addEventListener('wheel', (e) => {
 }, { capture: true, passive: false });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// -- multiplayer (beta) -------------------------------------------------------------------------
+
+function textInput(value, attrs) {
+  return h('input.text', { type: 'text', value: value || '', spellcheck: 'false', autocomplete: 'off', ...attrs });
+}
+
+function onlineAnswer(r) {
+  if (!r) return;
+  if (r.error) message(r.error);
+  const { error, ...info } = r;
+  if (info.network || info.missing) S.online = info;
+  renderPage();
+}
+
+function onlinePage() {
+  const o = S.online || {};
+  const out = [h('div.banner.warn', icon('alert'), h('div', T('online_warning')))];
+  if (o.missing) return [...out, h('div.banner.warn', icon('x'), h('div', o.missing))];
+  const net = o.network || {};
+  const level = { radmin: 'ok', tailscale: 'ok', lan: 'warn' }[net.kind] || 'error';
+  out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_network'))),
+    h(`div.game-state.${level}`, icon(level === 'ok' ? 'check' : level === 'warn' ? 'alert' : 'x'), h('div', net.text)),
+    h('div.card-help', helpText(T('online_net_help'))),
+    h('div.page-actions.inline',
+      h('button.btn.ghost', { onclick: () => api().online_info().then(onlineAnswer) }, icon('reset'), T('online_refresh')),
+      h('button.btn', { onclick: () => api().open_url('radmin') }, icon('download'), T('online_get_radmin')))));
+  const busy = o.busy || ui.onlineBusy;
+  const saves = h('section.card', h('div.card-head', h('div.card-title', T('online_saves'))),
+    h('div.card-help', h('div.help.open', T('online_saves_help'))));
+  if (o.room) {
+    const room = o.room;
+    out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_room'))),
+      h('div.room',
+        h('div.room-code', room.code),
+        h('button.btn', { onclick: () => { navigator.clipboard.writeText(room.code).then(() => toast(T('online_copied'))); } },
+          icon('file'), T('online_copy'))),
+      h('div.card-help', h('div.help.open', T(room.host ? 'online_you_host' : 'online_you_join').replace('{nickname}', room.nickname))),
+      room.host ? [h('div.card-help', h('div.help.open', T('online_send'))),
+        h('div.page-actions.inline', h('button.btn', { onclick: async () => {
+          const r = await api().online_save_connection();
+          if (r && r.text) toast(r.text);
+        } }, icon('save'), T('online_save_connection')))] : null,
+      h('div.page-actions.inline',
+        h('button.btn.primary', { disabled: S.playing, onclick: async () => {
+          const r = await api().online_play();
+          if (r && r.error) { if (r.page) { ui.page = r.page; renderPage(); } message(r.error); return; }
+          if (r && r.playing) { S.playing = true; renderBar(); renderPage(); }
+        } }, T('online_play')),
+        h('button.btn.danger', { disabled: S.playing, onclick: () => api().online_close().then(onlineAnswer) },
+          icon('x'), T(room.host ? 'online_close' : 'online_leave')))));
+    out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_steps'))),
+      h('div.card-help', h('div.help.open', T('online_steps_help')))));
+    out.push(saves);
+    return out;
+  }
+  const nick = textInput(o.nickname, { maxlength: 16, placeholder: 'Lesca' });
+  out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_nickname'))),
+    h('div.folder', nick), h('div.card-help', { style: 'padding-top:8px' }, helpText(T('online_nickname_help')))));
+  const start = (call) => async () => {
+    ui.onlineBusy = true;
+    renderPage();
+    onlineAnswer(await call());
+  };
+  out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_host'))),
+    h('div.card-help', helpText(T('online_host_help'))),
+    h('div.page-actions.inline', h('button.btn.primary', { disabled: busy,
+      onclick: start(() => api().online_host(nick.value.trim())) }, busy ? T('online_working') : T('online_host_button')))));
+  const code = textInput(ui.onlineCode, { maxlength: 16, placeholder: 'ABCD1234', style: 'text-transform:uppercase',
+    oninput: () => { ui.onlineCode = code.value; } });
+  out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_join'))),
+    h('div.card-help', helpText(T('online_join_help'))),
+    h('div.folder', h('div.folder-path', { title: o.connection || '' }, o.connection || T('online_connection')),
+      h('button.btn', { onclick: () => api().online_choose_connection().then(onlineAnswer) }, icon('folder'), T('online_choose'))),
+    h('div.folder', code,
+      h('button.btn.primary', { disabled: busy, onclick: start(() => api().online_join(code.value.trim(), nick.value.trim())) },
+        busy ? T('online_working') : T('online_join_button')))));
+  out.push(saves);
+  return out;
+}
+
 // -- pages --------------------------------------------------------------------------------------
 
 function homePage() {
@@ -352,7 +433,7 @@ function renderPage() {
     h('button.btn.ghost', { onclick: () => { S.update = null; renderPage(); } }, T('update_later')),
     h('button.btn.primary', { onclick: () => action('install_update') }, T('update_now'))) : null;
   const content = h('div.content', page.type === 'home' ? null : head, update,
-    page.type === 'home' ? homePage() : settingsPage(page));
+    page.type === 'home' ? homePage() : page.type === 'online' ? onlinePage() : settingsPage(page));
   scroll.replaceChildren(content);
   scroll.scrollTop = top;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === ui.page));
@@ -388,7 +469,7 @@ function render() {
   const app = document.getElementById('app');
   const nav = h('nav.nav', S.pages.map(p => h(`button.nav-item${p.id === ui.page ? '.active' : ''}`,
     { 'data-page': p.id, onclick: () => { ui.page = p.id; ui.capturing = null; document.querySelector('.scroll').scrollTop = 0; renderPage(); } },
-    icon(p.icon), p.title)));
+    icon(p.icon), p.title, p.badge ? h('span.nav-badge', p.badge) : null)));
   const side = h('aside.sidebar',
     h('div.brand', h('div.brand-icon', { style: S.icon ? `background-image:url(${S.icon})` : '' }),
       h('div.brand-name', 'KILLZONE', h('small', 'SHADOW FALL'))),
@@ -498,7 +579,13 @@ window.kz = {
       case 'fsr4': ui.fsr4 = data; if (data.state === 'ready') S.fsr4_ready = true; renderPage(); break;
       case 'update': S.update = data; renderPage(); break;
       case 'status': ui.status = data; renderBar(); break;
-      case 'playing': S.playing = data.playing; renderBar(); break;
+      case 'playing': S.playing = data.playing; renderBar(); if (ui.page === 'online') renderPage(); break;
+      case 'online':
+        ui.onlineBusy = false;
+        if (data.error) message(data.error);
+        { const { error, ...info } = data; S.online = info; }
+        if (ui.page === 'online') renderPage();
+        break;
       case 'state': { const playing = S.playing; S = data; S.playing = playing; render(); break; }
       case 'message':
         if (data.logs) modal(data.text, [{ label: T('close'), value: false }, { label: T('open_logs_q'), value: true, primary: true }])

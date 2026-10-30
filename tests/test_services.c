@@ -3,7 +3,10 @@
 #include "../src/runtime_services.c"
 #include <assert.h>
 
-uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *nid) { (void)table; (void)count; (void)nid; return 0; }
+uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *nid) {
+    for (size_t i=0;i<count;i++) if (!strcmp(table[i].name,nid)) return (uintptr_t)table[i].function;
+    return 0;
+}
 int gow3gpu_text_input_begin(const char *text, const char *prompt) { (void)text; (void)prompt; return 0; }
 int gow3gpu_text_input_poll(char *text, uint64_t size) { (void)text; (void)size; return 0; }
 int64_t runtime_file_open(const char *path, int flags, int mode) { (void)path; (void)flags; (void)mode; return -1; }
@@ -14,6 +17,10 @@ int gow3gpu_choice_begin(const char *title, const char *const *items, const char
 int gow3gpu_choice_poll(void) { return choice_next; }
 int runtime_savedata_param(int32_t user, const char *dir, void *param) { (void)user; (void)dir; (void)param; return -1; }
 int runtime_savedata_icon(int32_t user, const char *dir, char *out, size_t size) { (void)user; (void)dir; (void)out; (void)size; return -1; }
+#ifdef _WIN32
+static int32_t guest_errno;
+int32_t *runtime_errno(void) { return &guest_errno; }
+#endif
 
 int main(void) {
     unsigned char param[128]={0}, result[64]={0}; /* the game zeroes the pointers it does not want */
@@ -82,6 +89,50 @@ int main(void) {
     assert(trophy_unlock_state(1,1,NULL,&count)==TROPHY_INVALID && trophy_release(0)==TROPHY_INVALID);
 
     float ratio=0; assert(safe_area(&ratio)==0 && ratio==1.0f && safe_area(NULL)==SYSTEM_PARAMETER);
+
+    FILE *trace=tmpfile(); assert(trace);
+    net_trace_line(trace,"sceNetSend",3);
+    rewind(trace);
+    char line[80]; assert(fgets(line,sizeof line,trace) && !strcmp(line,"NETTRACE sceNetSend result=3\n"));
+    fclose(trace);
+    int32_t state=0;
+    assert(trace_sceNpGetState(USER_ID,&state)==0 && state==1);
+    assert(trace_sceNetCtlGetState(&state)==0 && state==0);
+    assert(trace_sceNetCtlGetState(NULL)==NET_CTL_INVALID_ADDR);
+#ifdef _WIN32
+    assert(_putenv_s("KZSF_PROBE_LINK","1")==0);
+#else
+    assert(setenv("KZSF_PROBE_LINK","1",1)==0);
+#endif
+    assert(netctl_state(&state)==0 && state==3);
+    assert(np_state(USER_ID,&state)==0 && state==1);
+#ifdef _WIN32
+    assert(_putenv_s("KZSF_PROBE_LINK","")==0);
+#else
+    assert(unsetenv("KZSF_PROBE_LINK")==0);
+#endif
+    assert(netctl_state(&state)==0 && state==0);
+    assert(trace_sceNetSend(2,"abc",3)==3 && trace_sceNetRecv()==NET_EWOULDBLOCK);
+    assert(trace_sceRudpWrite()==0);
+#ifdef _WIN32
+    assert(_putenv_s("KZSF_NET_TRACE","")==0);
+#else
+    assert(unsetenv("KZSF_NET_TRACE")==0);
+#endif
+    assert(runtime_services_resolve("sceRudpWrite")== (uintptr_t)trace_sceRudpWrite);
+    assert(runtime_services_resolve("sceNetCtlGetInfo")== (uintptr_t)trace_sceNetCtlGetInfo);
+#ifdef _WIN32
+    assert(_putenv_s("KZSF_NET_TRACE","1")==0);
+#else
+    assert(setenv("KZSF_NET_TRACE","1",1)==0);
+#endif
+    assert(runtime_services_resolve("sceRudpWrite")== (uintptr_t)trace_sceRudpWrite);
+#ifdef _WIN32
+    assert(_putenv_s("KZSF_NET_TRACE","0")==0);
+#else
+    assert(setenv("KZSF_NET_TRACE","0",1)==0);
+#endif
+    assert(runtime_services_resolve("sceRudpWrite")== (uintptr_t)ok_void);
     puts("services test: ok");
     return 0;
 }

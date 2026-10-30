@@ -1,0 +1,53 @@
+{
+  "source": {
+    "application_version": "01.81",
+    "core_sha256": "5f70590fa183454ec447a45daeea766e6fd516258ebf6a6d99fc85483af961fc",
+    "patch_sha256": "33d65f4b94366b28052596d735f15fada6deea72f6cd6c8c8ad117798d4d6b80",
+    "decoded_rttibin_sha256": "504a7e36d37aeebb11fe422d68a9c5f22204d9c426696b3d75cb7f737c795893",
+    "decoded_rttibin_bytes": 6755897
+  },
+  "profile_namespace": "m",
+  "initial_count": 5,
+  "boosts": [
+    {
+      "reward_id": "GV1",
+      "name_localizer_key": "CombatHonorDoubleValor"
+    },
+    {
+      "reward_id": "GRED",
+      "name_localizer_key": "CombatHonorReducedExplosiveDamage"
+    },
+    {
+      "reward_id": "GFAD",
+      "name_localizer_key": "CombatHonorFasterArmDisarm"
+    },
+    {
+      "reward_id": "GFM",
+      "name_localizer_key": "CombatHonorFasterMovement"
+    },
+    {
+      "reward_id": "GFHR",
+      "name_localizer_key": "CombatHonorFasterHealthRegeneration"
+    },
+    {
+      "reward_id": "GET",
+      "name_localizer_key": "CombatHonorExtraThrowables"
+    },
+    {
+      "reward_id": "GFD",
+      "name_localizer_key": "CombatHonorFasterDestruct"
+    },
+    {
+      "reward_id": "GCK",
+      "name_localizer_key": "CombatHonorCaptureKing"
+    },
+    {
+      "reward_id": "GV2",
+      "name_localizer_key": "CombatHonorTripleValor"
+    },
+    {
+      "reward_id": "GRFD",
+      "name_localizer_key": "CombatHonorReducedFallDamage"
+    }
+  ]
+}

@@ -244,4 +244,24 @@
             <Line Type="bytes" Address="0x0072bb66" Value="00008e93" Pattern="48 05 00 00 8e e5 49 89 86 40 01 00" At="2"/>
         </PatchList>
     </Metadata>
+    <!-- Private multiplayer (beta): selected by the multiplayer launch only. -->
+    <!-- HUDNameComponent: enemy exposure is never; always use its existing visibility query. -->
+    <Metadata Title="Killzone Shadow Fall" Name="Private Multiplayer - HUD Visibility" Note="Hide Basecamp Turret and enemy HUD names; require unobscured visibility for other HUD names." Author="KZSF private multiplayer prototype" PatchVer="1.0" AppVer="01.81" AppElf="eboot.bin" isEnabled="false">
+        <PatchList>
+            <Line Type="bytes" Address="0x0135b9e3" Value="31c090" Pattern="c5 fa 10 45 90 c5 f8 2e 43 78 77 4a 8b 43 7c eb 12 c5 fa 10 45 90 c5 f8 2e 43 74 77 39" At="12"/>
+            <Line Type="bytes" Address="0x0135ba10" Value="9090" Pattern="80 bb 84 00 00 00 00 74 17 48 8d 75 a8 4c 89 ef 48 8b 55 88 8b 4d 10 e8 9b 04 00 00 84 c0 75 04" At="7"/>
+            <!-- Exact cached localizer key; the cave is PLT-to-rodata alignment padding. -->
+            <Line Type="bytes" Address="0x0135b6e0" Value="e9bb282100909090" Pattern="4d 8b 75 38 c6 45 a7 00 41 f6 86 29 02 00 00 02 0f 85 37 03 00 00" At="0"/>
+            <Line Type="bytes" Address="0x0156dfa0" Value="4d8b7538c645a700498b45484885c0743c83780816753648b94875644e616d655f48394810752648b94261736563616d7048394818751681782054757272750d6681782465747505e940dadeffe9f6d6deff" Pattern="ff 25 c2 4b 6f 00 68 2c 02 00 00 e9 20 dd ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" At="24"/>
+        </PatchList>
+    </Metadata>
+    <!-- MPAllUnlocked plus the two challenge-icon UI locks; preserve challenge progress. -->
+    <Metadata Title="Killzone Shadow Fall" Name="Private Multiplayer - Full Unlocks" Note="Enable MPAllUnlocked for equipment, maximum ability upgrades, Insurgent and card packs; allow challenge player card icon selection. Rank and challenge progress are separate." Author="KZSF private multiplayer prototype" PatchVer="1.1" AppVer="01.81" AppElf="eboot.bin" isEnabled="false">
+        <PatchList>
+            <Line Type="bytes" Address="0x013dcaa0" Value="5031c04889471848894710c6471d0158" Pattern="48 8d 05 39 8b 84 00 48 83 c0 10 48 89 07 48 b8 01 01 01 01 01 01 01 01 48 89 47 08 c6 47 20 00 48 c7 47 18 00 00 00 00 48 c7 47 10 00 00 00 00 66 c7 47 30 00 00 c7 47 2c 00 00 00 00 48 c7 47 24 00 00 00 00 66 c7 47 32 01 00 c6 47 34 00 c3" At="32"/>
+            <!-- playericonchallenges grouped/single icons: locked=false, completed unchanged. -->
+            <Line Type="bytes" Address="0x012c41e6" Value="31c0" Pattern="4c 8d b5 40 ff ff ff 48 8d 35 4a 8a 3a 00 4c 89 f7 e8 14 ee 3d ff 49 8b 45 00 4c 89 ef ff 50 20 34 01 0f b6 d0 48 89 df 4c 89 f6 e8 5a ab 54 ff 41 08 44 24 08 4c 89 f7 e8 8d f2 3d ff" At="32"/>
+            <Line Type="bytes" Address="0x012c47dc" Value="31c0" Pattern="48 8d 9d 48 ff ff ff 48 8d 35 53 84 3a 00 48 89 df e8 1d e8 3d ff 4c 89 f7 48 8b 07 ff 50 20 34 01 0f b6 d0 4c 89 e7 48 89 de e8 64 a5 54 ff 41 08 45 08 48 89 df e8 98 ec 3d ff" At="31"/>
+        </PatchList>
+    </Metadata>
 </Patch>

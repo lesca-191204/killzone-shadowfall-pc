@@ -7,6 +7,7 @@ GOW3_USER_DIR, ...). Extra arguments go to gow3-probe.
 The in-game "Apply and restart" runs this script again through GOW3_RESTART_COMMAND;
 `--after PID` waits for the previous game process to end first (its GPU device and memory).
 """
+from contextlib import nullcontext
 import os
 from pathlib import Path
 import shlex
@@ -358,18 +359,33 @@ def main():
                    '--patches', str(out / 'patches.bin'), '--app0', str(game),
                    '--user', str(user_dir),
                    '--timeout', env.get('GOW3_TIMEOUT', '0'), *isa_args, *glyph_args, *args]
-        # No stdin: an inherited pipe (shells such as Git Bash) cost the game its console output.
-        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, creationflags=no_console())
-        presence = None
+        # Private multiplayer (beta): the free map packs (FREECONTENT folders beside the game)
+        # join the game's cache. Adapted from the KZSF private multiplayer prototype.
+        dlc = nullcontext([])
+        if env.get('KZSF_PRIVATE_HTTP'):
+            from dlc_cache import cache_mounts
+            dlc = cache_mounts(game, data / 'out')
+        process = None
         try:
-            try:
-                presence = discord_presence.Presence(pid=process.pid) if discord_presence else None
-            except (OSError, RuntimeError):
-                print('Discord presence unavailable; the game will continue', flush=True)
+            with dlc as dlc_args:
+                # No stdin: an inherited pipe (shells such as Git Bash) cost the game its console output.
+                process = subprocess.Popen([*command, *dlc_args], stdin=subprocess.DEVNULL, creationflags=no_console())
+                presence = None
+                try:
+                    try:
+                        presence = discord_presence.Presence(pid=process.pid) if discord_presence else None
+                    except (OSError, RuntimeError):
+                        print('Discord presence unavailable; the game will continue', flush=True)
+                    return process.wait()
+                finally:
+                    if presence:
+                        presence.close()
+        except ValueError as error:
+            if process:
+                raise
+            print(f'DLC maps not added: {error}', flush=True)
+            process = subprocess.Popen(command, stdin=subprocess.DEVNULL, creationflags=no_console())
             return process.wait()
-        finally:
-            if presence:
-                presence.close()
     finally:
         if mod_view:
             shutil.rmtree(mod_view, ignore_errors=True)

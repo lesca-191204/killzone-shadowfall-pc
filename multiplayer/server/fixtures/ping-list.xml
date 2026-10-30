@@ -1,0 +1,9 @@
+<pingListResult xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <locations xsi:type="serverLocation">
+    <location>local</location>
+    <servers xsi:type="serverAddress">
+      <ip>127.0.0.1</ip>
+      <port>17802</port>
+    </servers>
+  </locations>
+</pingListResult>

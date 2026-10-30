@@ -61,6 +61,12 @@ uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *n
 uintptr_t runtime_kernel_resolve(const char *name);
 uintptr_t runtime_file_resolve(const char *name);
 uintptr_t runtime_services_resolve(const char *name);
+uintptr_t runtime_network_resolve(const char *name);
+int32_t runtime_network_wake_udp(int fd,const void *data,uint32_t size,uint16_t *port);
+int32_t runtime_network_prepare_udp(int fd);
+uintptr_t runtime_http_resolve(const char *name);
+uintptr_t runtime_rudp_resolve(const char *name);
+uintptr_t runtime_np_webapi_resolve(const char *name);
 void runtime_file_report(void);
 void runtime_file_configure(const char *app0, const char *user);
 int runtime_file_mount(const char *guest, const char *host);

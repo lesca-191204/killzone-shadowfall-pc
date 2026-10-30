@@ -1,0 +1,25 @@
+<settingsSet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <entry>
+    <key>client.connection.urns</key>
+    <value xsi:type="jaxbCollection">
+      <Item xsi:type="urn"><ID>activeconnection</ID><rule/><URN>gameservice:events/activeconnection</URN></Item>
+      <Item xsi:type="urn"><ID>acknowledge-event</ID><rule/><URN>gameservice:events/acknowledge</URN></Item>
+      <Item xsi:type="urn"><ID>profile-get</ID><rule/><URN>gameservice:profile/get</URN></Item>
+      <Item xsi:type="urn"><ID>profile-update</ID><rule/><URN>gameservice:profile/update</URN></Item>
+      <Item xsi:type="urn"><ID>profile-delete</ID><rule/><URN>gameservice:profile/delete</URN></Item>
+      <Item xsi:type="urn"><ID>pinglist</ID><rule/><URN>gameservice:network/pinglist</URN></Item>
+      <Item xsi:type="urn"><ID>match-message</ID><rule/><URN>gameservice:match/message</URN></Item>
+      <Item xsi:type="urn"><ID>clan-myclan</ID><rule/><URN>gameservice:clan/myclan</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-get</ID><rule/><URN>gameservice:playlist/get</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-get-with-version</ID><rule/><URN>gameservice:playlist/get-with-version</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-get-active</ID><rule/><URN>gameservice:playlist/get-active</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-add</ID><rule/><URN>gameservice:playlist/add</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-find-by-tags</ID><rule/><URN>gameservice:playlist/find-by-tags</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-find-by-ids</ID><rule/><URN>gameservice:playlist/find-by-ids</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-find-by-filter</ID><rule/><URN>gameservice:playlist/find-by-filter</URN></Item>
+      <Item xsi:type="urn"><ID>playlist-get-recommended-by-tags</ID><rule/><URN>gameservice:playlist/get-recommended-by-tags</URN></Item>
+    </value>
+    <version>4</version>
+  </entry>
+  <version>4</version>
+</settingsSet>

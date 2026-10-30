@@ -45,8 +45,35 @@ static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 static int next_id=1;
 static int new_id(void) { pthread_mutex_lock(&lock); int id=next_id++; pthread_mutex_unlock(&lock); return id; }
 static void note(const char *what) { printf("Runtime: %s\n",what); }
+static void net_trace_line(FILE *out,const char *api,int32_t result) {
+    fprintf(out,"NETTRACE %s result=%d\n",api,result);
+}
 
 /* ---- UserService ---- */
+static int np_private_auth_enabled(void);
+static const char *local_user_slot(void) {
+    if (!np_private_auth_enabled()) return USER_NAME;
+    const char *player=getenv("KZSF_PRIVATE_PLAYER");
+    if (!player || !*player) return USER_NAME;
+    if (!strcmp(player,"Player1")) return "Player1";
+    if (!strcmp(player,"Player2")) return "Player2";
+    return NULL; /* Reject an invalid configured identity rather than aliasing another player. */
+}
+static const char *local_user_name(void) {
+    const char *slot=local_user_slot();
+    if (!slot || !np_private_auth_enabled()) return slot;
+    const char *name=getenv("KZSF_PRIVATE_NICKNAME");
+    if (!name || !*name) return slot;
+    if (!strcmp(slot,USER_NAME)) return NULL;
+    size_t size=strlen(name);
+    if (size<3 || size>16) return NULL;
+    for (size_t i=0;i<size;++i) {
+        unsigned char c=(unsigned char)name[i];
+        if (!((c>='A' && c<='Z') || (c>='a' && c<='z') ||
+              (c>='0' && c<='9') || c=='_' || c=='-')) return NULL;
+    }
+    return name;
+}
 static int login_event_pending=1;
 static ABI int32_t user_initialize(const void *params) { (void)params; note("UserService initialized (user 1 logged in)"); return 0; }
 static ABI int32_t user_terminate(void) { return 0; }
@@ -57,8 +84,10 @@ static ABI int32_t user_list(int32_t *ids) {
 }
 static ABI int32_t user_name(int32_t id,char *name,uint64_t size) {
     if (id!=USER_ID || !name) return USER_INVALID_ARGUMENT;
-    if (sizeof USER_NAME>size) return (int32_t)0x8096000a; /* BUFFER_TOO_SHORT */
-    strcpy(name,USER_NAME); return 0;
+    const char *local=local_user_name();
+    if (!local) return USER_INVALID_ARGUMENT;
+    if (strlen(local)+1>size) return (int32_t)0x8096000a; /* BUFFER_TOO_SHORT */
+    strcpy(name,local); return 0;
 }
 static ABI int32_t user_event(int32_t *event) {
     if (!event) return USER_INVALID_ARGUMENT;
@@ -181,8 +210,22 @@ static ABI int32_t net_sock_info(int32_t s,void *info,int32_t n,int32_t flags) {
 }
 /* libScePosix sockets: -1 with the guest errno, the network is unreachable. */
 static ABI int32_t posix_unreachable(void) { *runtime_errno()=51; return -1; }
-static ABI int32_t netctl_state(int32_t *state) { if (!state) return NET_CTL_INVALID_ADDR; *state=0; return 0; }
-static ABI int32_t netctl_info(int code,void *info) { (void)code; (void)info; return NET_CTL_NOT_CONNECTED; }
+static ABI int32_t netctl_state(int32_t *state) {
+    if (!state) return NET_CTL_INVALID_ADDR;
+    const char *probe=getenv("KZSF_PROBE_LINK");
+    /* Diagnostic override only; UDP is enabled separately by KZSF_PROBE_UDP. */
+    *state=probe && !strcmp(probe,"1") ? 3 : 0;
+    return 0;
+}
+static ABI int32_t netctl_info(int code,void *info) {
+    const char *endpoint=getenv("KZSF_PRIVATE_HTTP");
+    if (code==3 && endpoint && !strcmp(endpoint,"http://127.0.0.1:17800")) {
+        if (!info) return NET_CTL_INVALID_ADDR;
+        /* Turbine reads the MTU even after an error; our private transport advertises 1500. */
+        uint32_t mtu=1500; memcpy(info,&mtu,sizeof mtu); return 0;
+    }
+    return NET_CTL_NOT_CONNECTED;
+}
 static ABI int32_t netctl_register(void *cb,void *arg,int32_t *cid) { (void)cb; (void)arg; if (!cid) return NET_CTL_INVALID_ADDR; *cid=new_id(); return 0; }
 static ABI int32_t netctl_check(void) { return 0; }
 static ABI int32_t netctl_unregister(int cid) { (void)cid; return 0; }
@@ -211,11 +254,42 @@ static ABI int32_t http_wait(void *handle,void *events,int32_t max,int64_t timeo
     return 0; /* no events: nothing is in flight */
 }
 
-/* ---- NP (PSN): signed out ---- */
+/* ---- NP (PSN): signed out, with an opt-in synthetic identity for local diagnostics ---- */
+#define NP_USER_NOT_FOUND ((int32_t)0x80550007)
+typedef struct { char data[16]; char term; char dummy[3]; } NpOnlineId;
+typedef struct { NpOnlineId handle; unsigned char opt[8],reserved[8]; } NpId;
+_Static_assert(sizeof(NpOnlineId)==20,"NP online ID ABI size");
+_Static_assert(sizeof(NpId)==36,"NP ID ABI size");
+_Static_assert(sizeof USER_NAME<=17,"Local online ID must fit 16 characters");
+static int np_probe_enabled(void) {
+    const char *value=getenv("KZSF_PROBE_NP");
+    return value && !strcmp(value,"1");
+}
 static ABI int32_t np_state(int32_t user,int32_t *state) {
     if (!state) return NP_INVALID_ARGUMENT;
-    (void)user; *state=1; /* SIGNED_OUT */
+    if (user!=USER_ID) return NP_USER_NOT_FOUND;
+    if (!local_user_name()) return NP_INVALID_ARGUMENT;
+    *state=np_probe_enabled() ? 2 : 1; /* synthetic SIGNED_IN or SIGNED_OUT */
     return 0;
+}
+static ABI int32_t np_online_id(int32_t user,NpOnlineId *id) {
+    if (!id) return NP_INVALID_ARGUMENT;
+    if (user!=USER_ID) return NP_USER_NOT_FOUND;
+    if (!np_probe_enabled()) return NP_SIGNED_OUT;
+    const char *local=local_user_name();
+    if (!local) return NP_INVALID_ARGUMENT;
+    memset(id,0,sizeof *id);
+    memcpy(id->data,local,strlen(local));
+    return 0;
+}
+static ABI int32_t np_id(int32_t user,NpId *id) {
+    if (!id) return NP_INVALID_ARGUMENT;
+    if (user!=USER_ID) return NP_USER_NOT_FOUND;
+    if (!np_probe_enabled()) return NP_SIGNED_OUT;
+    NpId local={0};
+    int32_t result=np_online_id(user,&local.handle);
+    if (result) return result;
+    *id=local; return 0;
 }
 static ABI int32_t np_signed_out(void) { return NP_SIGNED_OUT; }
 static ABI int32_t np_register(void *cb,void *arg) { (void)cb; (void)arg; return new_id(); }
@@ -231,13 +305,238 @@ static ABI int32_t np_account_id(const void *online_id,uint64_t *account) {
     if (!online_id || !account) return NP_INVALID_ARGUMENT;
     *account=0; return NP_SIGNED_OUT;
 }
-static ABI int32_t np_account_country(const void *online_id,void *country) {
-    return online_id && country ? NP_SIGNED_OUT : NP_INVALID_ARGUMENT;
+#define NP_INVALID_SIZE ((int32_t)0x80550011)
+#define NP_ABORTED ((int32_t)0x80550012)
+#define NP_REQUEST_MAX ((int32_t)0x80550013)
+#define NP_REQUEST_NOT_FOUND ((int32_t)0x80550014)
+#define NP_INVALID_ID ((int32_t)0x80550015)
+typedef struct { uint64_t size,affinity; int32_t priority; unsigned char padding[4]; } NpAsyncParam;
+typedef struct { unsigned char content,chat,user_content; } NpParentalInfo;
+typedef struct { char code[2],end,pad; } NpCountryCode;
+typedef struct { char code[6],padding[10]; } NpLanguageCode;
+typedef struct {
+    uint64_t size; int32_t user; unsigned char padding[4];
+    uint64_t features; unsigned char reserved[32];
+} NpCheckPlusParam;
+typedef struct { unsigned char authorized,reserved[32]; } NpCheckPlusResult;
+_Static_assert(sizeof(NpAsyncParam)==24,"NP async parameter ABI size");
+_Static_assert(sizeof(NpParentalInfo)==3,"NP parental info ABI size");
+_Static_assert(sizeof(NpCountryCode)==4,"NP country ABI size");
+_Static_assert(sizeof(NpLanguageCode)==16,"NP language ABI size");
+_Static_assert(sizeof(NpCheckPlusParam)==56,"NP Plus parameter ABI size");
+_Static_assert(sizeof(NpCheckPlusResult)==33,"NP Plus result ABI size");
+/* Synthetic diagnostic data, unrelated to the user's real account or age. */
+static const struct {
+    int8_t age;
+    NpParentalInfo restrictions;
+    NpCountryCode country;
+    NpLanguageCode language;
+} np_probe_profile={.age=18,.country={.code={'u','s'}},.language={.code="en"}};
+enum { NP_REQUEST_PENDING=1,NP_REQUEST_COMPLETE,NP_REQUEST_ABORTED };
+typedef struct { int32_t id,result; int state; } NpManagerRequest;
+static NpManagerRequest np_manager_requests[32];
+static int32_t np_manager_next_id=0x20000001;
+static pthread_mutex_t np_manager_lock=PTHREAD_MUTEX_INITIALIZER;
+static int32_t np_validate_online_id(const NpOnlineId *online) {
+    const char *name=local_user_name();
+    if (!name || !online) return NP_INVALID_ARGUMENT;
+    NpOnlineId local={0};
+    memcpy(local.data,name,strlen(name));
+    return !online->term && !memcmp(online->data,local.data,sizeof local.data) ? 0 : NP_USER_NOT_FOUND;
 }
-static ABI int32_t np_account_language(int32_t request,const void *online_id,void *language) {
-    static int logged;
-    if (!logged) { logged=1; printf("Runtime: game asked for the NP account language (signed out)\n"); }
-    (void)request; return online_id && language ? NP_SIGNED_OUT : NP_INVALID_ARGUMENT;
+static NpManagerRequest *np_manager_find(int32_t id) {
+    for (size_t i=0;i<32;++i) if (np_manager_requests[i].id==id && id>0) return &np_manager_requests[i];
+    return NULL;
+}
+static ABI int32_t np_manager_create(const NpAsyncParam *param) {
+    if (!param) return NP_INVALID_ARGUMENT;
+    if (param->size!=sizeof *param) return NP_INVALID_SIZE;
+    pthread_mutex_lock(&np_manager_lock);
+    for (size_t i=0;i<32 && np_manager_next_id<INT32_MAX;++i) if (!np_manager_requests[i].id) {
+        int32_t id=np_manager_next_id++;
+        np_manager_requests[i]=(NpManagerRequest){id,0,NP_REQUEST_PENDING};
+        pthread_mutex_unlock(&np_manager_lock); return id;
+    }
+    pthread_mutex_unlock(&np_manager_lock); return NP_REQUEST_MAX;
+}
+/* Successful begin holds the lock until the profile output and request result are written. */
+static int32_t np_manager_begin(int32_t id,const NpOnlineId *online,NpManagerRequest **out) {
+    if (!online || !id) return NP_INVALID_ARGUMENT;
+    if (np_probe_enabled()) {
+        int32_t error=np_validate_online_id(online);
+        if (error) return error;
+    }
+    pthread_mutex_lock(&np_manager_lock);
+    NpManagerRequest *request=np_manager_find(id);
+    int32_t error=!request ? NP_REQUEST_NOT_FOUND :
+        request->state==NP_REQUEST_ABORTED ? NP_ABORTED :
+        request->state==NP_REQUEST_COMPLETE ? NP_INVALID_ARGUMENT :
+        !np_probe_enabled() ? NP_SIGNED_OUT : 0;
+    if (error) { pthread_mutex_unlock(&np_manager_lock); return error; }
+    *out=request; return 0;
+}
+static int32_t np_manager_complete(NpManagerRequest *request) {
+    request->result=0; request->state=NP_REQUEST_COMPLETE;
+    pthread_mutex_unlock(&np_manager_lock); return 0;
+}
+/* shadPS4 np_manager.cpp declares two arguments; do not inspect a spare RDX.
+ * Success means availability of this synthetic local environment, not PSN authentication. */
+static ABI int32_t np_check_availability(int32_t id,const NpOnlineId *online) {
+    NpManagerRequest *request;
+    int32_t result=np_manager_begin(id,online,&request);
+    if (result) return result;
+    return np_manager_complete(request);
+}
+/* Guest 0x8e3476 requests feature 1. This is local test-session eligibility only;
+ * it neither checks nor grants a real PSN subscription. Preserve reserved output bytes. */
+static ABI int32_t np_check_plus(int32_t id,const NpCheckPlusParam *param,NpCheckPlusResult *out) {
+    if (!id || !param || !out) return NP_INVALID_ARGUMENT;
+    if (param->size!=sizeof *param) return NP_INVALID_SIZE;
+    if (param->user==-1 || param->features!=1) return NP_INVALID_ARGUMENT;
+    for (size_t i=0;i<sizeof param->reserved;++i)
+        if (param->reserved[i]) return NP_INVALID_ARGUMENT;
+    if (!np_private_auth_enabled()) return NP_SIGNED_OUT;
+    NpOnlineId online;
+    int32_t result=np_online_id(param->user,&online);
+    if (result) return result;
+    NpManagerRequest *request;
+    result=np_manager_begin(id,&online,&request);
+    if (result) return result;
+    out->authorized=1;
+    return np_manager_complete(request);
+}
+static ABI int32_t np_manager_poll(int32_t id,int32_t *result) {
+    if (!result) return NP_INVALID_ARGUMENT;
+    pthread_mutex_lock(&np_manager_lock);
+    NpManagerRequest *request=np_manager_find(id);
+    int32_t error=!request ? NP_REQUEST_NOT_FOUND :
+        request->state==NP_REQUEST_PENDING && np_probe_enabled() ? NP_INVALID_ID : 0;
+    if (!error) *result=np_probe_enabled() ? request->result : NP_SIGNED_OUT;
+    pthread_mutex_unlock(&np_manager_lock); return error;
+}
+static ABI int32_t np_manager_delete(int32_t id) {
+    pthread_mutex_lock(&np_manager_lock);
+    NpManagerRequest *request=np_manager_find(id);
+    if (request) *request=(NpManagerRequest){0};
+    pthread_mutex_unlock(&np_manager_lock); return request ? 0 : NP_REQUEST_NOT_FOUND;
+}
+static ABI int32_t np_manager_abort(int32_t id) {
+    pthread_mutex_lock(&np_manager_lock);
+    NpManagerRequest *request=np_manager_find(id);
+    if (request && request->state!=NP_REQUEST_COMPLETE) {
+        request->state=NP_REQUEST_ABORTED; request->result=NP_ABORTED;
+    }
+    pthread_mutex_unlock(&np_manager_lock); return request ? 0 : NP_REQUEST_NOT_FOUND;
+}
+static ABI int32_t np_parental_info(int32_t id,const NpOnlineId *online,int8_t *age,NpParentalInfo *info) {
+    if (!age || !info) return NP_INVALID_ARGUMENT;
+    NpManagerRequest *request;
+    int32_t result=np_manager_begin(id,online,&request);
+    if (result) return result;
+    *age=np_probe_profile.age; *info=np_probe_profile.restrictions;
+    return np_manager_complete(request);
+}
+static ABI int32_t np_account_country(const NpOnlineId *online,NpCountryCode *country) {
+    if (!online || !country) return NP_INVALID_ARGUMENT;
+    if (!np_probe_enabled()) return NP_SIGNED_OUT;
+    int32_t error=np_validate_online_id(online);
+    if (error) return error;
+    *country=np_probe_profile.country; return 0;
+}
+static ABI int32_t np_account_language(int32_t id,const NpOnlineId *online,NpLanguageCode *language) {
+    if (!language) return NP_INVALID_ARGUMENT;
+    NpManagerRequest *request;
+    int32_t result=np_manager_begin(id,online,&request);
+    if (result) return result;
+    *language=np_probe_profile.language;
+    return np_manager_complete(request);
+}
+/* NP Auth: synthetic codes for the explicitly selected local test server only. */
+#define NP_AUTH_INVALID_ARGUMENT ((int32_t)0x80550301)
+#define NP_AUTH_INVALID_SIZE ((int32_t)0x80550302)
+#define NP_AUTH_ABORTED ((int32_t)0x80550304)
+#define NP_AUTH_REQUEST_MAX ((int32_t)0x80550305)
+#define NP_AUTH_REQUEST_NOT_FOUND ((int32_t)0x80550306)
+#define NP_AUTH_INVALID_ID ((int32_t)0x80550307)
+typedef struct { char id[129]; unsigned char padding[7]; } NpClientId;
+typedef struct { char code[129]; unsigned char padding[7]; } NpAuthorizationCode;
+typedef struct {
+    uint64_t size;
+    const NpOnlineId *online;
+    const NpClientId *client;
+    const char *scope;
+} NpAuthCodeParam;
+_Static_assert(sizeof(NpClientId)==136,"NP client ID ABI size");
+_Static_assert(sizeof(NpAuthorizationCode)==136,"NP authorization code ABI size");
+_Static_assert(sizeof(NpAuthCodeParam)==32,"NP authorization parameter ABI size");
+typedef struct { int32_t id,result; int state; } NpAuthRequest;
+static NpAuthRequest np_auth_requests[16];
+static int32_t np_auth_next_id=0x10000001;
+static pthread_mutex_t np_auth_lock=PTHREAD_MUTEX_INITIALIZER;
+static int np_private_auth_enabled(void) {
+    const char *endpoint=getenv("KZSF_PRIVATE_HTTP");
+    return np_probe_enabled() && endpoint && !strcmp(endpoint,"http://127.0.0.1:17800");
+}
+/* Caller holds np_auth_lock. Auth IDs cannot enter the Manager ID range. */
+static NpAuthRequest *np_auth_find(int32_t id) {
+    for (size_t i=0;i<16;++i) if (np_auth_requests[i].id==id && id>0) return &np_auth_requests[i];
+    return NULL;
+}
+static ABI int32_t np_auth_create(const NpAsyncParam *param) {
+    if (!param) return NP_AUTH_INVALID_ARGUMENT;
+    if (param->size!=sizeof *param) return NP_AUTH_INVALID_SIZE;
+    pthread_mutex_lock(&np_auth_lock);
+    for (size_t i=0;i<16 && np_auth_next_id<0x20000000;++i) if (!np_auth_requests[i].id) {
+        int32_t id=np_auth_next_id++;
+        np_auth_requests[i]=(NpAuthRequest){id,0,NP_REQUEST_PENDING};
+        pthread_mutex_unlock(&np_auth_lock); return id;
+    }
+    pthread_mutex_unlock(&np_auth_lock); return NP_AUTH_REQUEST_MAX;
+}
+static ABI int32_t np_auth_get_code(int32_t id,const NpAuthCodeParam *param,NpAuthorizationCode *code,int32_t *issuer) {
+    if (!param || !code) return NP_AUTH_INVALID_ARGUMENT;
+    if (param->size!=sizeof *param) return NP_AUTH_INVALID_SIZE;
+    if (!param->online || !param->client || !param->scope) return NP_AUTH_INVALID_ARGUMENT;
+    pthread_mutex_lock(&np_auth_lock);
+    NpAuthRequest *request=np_auth_find(id);
+    int32_t error=!request ? NP_AUTH_REQUEST_NOT_FOUND :
+        request->state==NP_REQUEST_ABORTED ? NP_AUTH_ABORTED :
+        request->state==NP_REQUEST_COMPLETE ? NP_AUTH_INVALID_ARGUMENT :
+        !np_private_auth_enabled() ? NP_SIGNED_OUT : np_validate_online_id(param->online);
+    if (!error) {
+        /* Neither a PSN credential nor an identity proof: only the private server accepts it. */
+        NpAuthorizationCode local={.code="KZSF_LOCAL_TEST"};
+        const char *slot=local_user_slot();
+        if (strcmp(slot,USER_NAME)) snprintf(local.code,sizeof local.code,"KZSF_LOCAL_TEST:%s",slot);
+        *code=local;
+        if (issuer) *issuer=0x100;
+        request->result=0; request->state=NP_REQUEST_COMPLETE;
+    }
+    pthread_mutex_unlock(&np_auth_lock); return error;
+}
+static ABI int32_t np_auth_poll(int32_t id,int32_t *result) {
+    if (!result) return NP_AUTH_INVALID_ARGUMENT;
+    int enabled=np_private_auth_enabled();
+    pthread_mutex_lock(&np_auth_lock);
+    NpAuthRequest *request=np_auth_find(id);
+    int32_t error=!request ? NP_AUTH_REQUEST_NOT_FOUND :
+        request->state==NP_REQUEST_PENDING && enabled ? NP_AUTH_INVALID_ID : 0;
+    if (!error) *result=enabled ? request->result : NP_SIGNED_OUT;
+    pthread_mutex_unlock(&np_auth_lock); return error;
+}
+static ABI int32_t np_auth_delete(int32_t id) {
+    pthread_mutex_lock(&np_auth_lock);
+    NpAuthRequest *request=np_auth_find(id);
+    if (request) *request=(NpAuthRequest){0};
+    pthread_mutex_unlock(&np_auth_lock); return request ? 0 : NP_AUTH_REQUEST_NOT_FOUND;
+}
+static ABI int32_t np_auth_abort(int32_t id) {
+    pthread_mutex_lock(&np_auth_lock);
+    NpAuthRequest *request=np_auth_find(id);
+    if (request && request->state!=NP_REQUEST_COMPLETE) {
+        request->state=NP_REQUEST_ABORTED; request->result=NP_AUTH_ABORTED;
+    }
+    pthread_mutex_unlock(&np_auth_lock); return request ? 0 : NP_AUTH_REQUEST_NOT_FOUND;
 }
 /* Word filter (offline): comments pass unchanged and requests finish at once. */
 #define NP_COMMUNITY_INSUFFICIENT_ARGUMENT ((int32_t)0x80550704)
@@ -691,6 +990,159 @@ static ABI int32_t open_psid(unsigned char *psid) {
 }
 
 
+/* Diagnostic wrappers preserve the offline contracts while exposing the path the game takes.
+ * Never log request bodies, account data, or game packets. */
+#define TRACE_STUB(api,impl) static ABI int32_t trace_##api(void) { \
+    int32_t result=impl(); net_trace_line(stderr,#api,result); return result; }
+TRACE_STUB(sceNpMatching2CreateContext,np_signed_out)
+TRACE_STUB(sceNpMatching2ContextStart,np_signed_out)
+TRACE_STUB(sceNpMatching2CreateJoinRoom,np_signed_out)
+TRACE_STUB(sceNpMatching2JoinRoom,np_signed_out)
+TRACE_STUB(sceNpMatching2SearchRoom,np_signed_out)
+TRACE_STUB(sceNpMatching2GetWorldInfoList,np_signed_out)
+TRACE_STUB(sceNpSetNpTitleId,ok_void)
+TRACE_STUB(sceNpSetContentRestriction,ok_void)
+TRACE_STUB(sceNpMatching2Initialize,ok_void)
+TRACE_STUB(sceNpWebApiCreateContext,np_signed_out)
+TRACE_STUB(sceNpWebApiSendRequest,np_signed_out)
+TRACE_STUB(sceHttpSendRequest,http_fail)
+TRACE_STUB(sceRudpInit,ok_void)
+TRACE_STUB(sceRudpCreateContext,ok_void)
+TRACE_STUB(sceRudpBind,ok_void)
+TRACE_STUB(sceRudpInitiate,ok_void)
+TRACE_STUB(sceRudpProcessEvents,ok_void)
+TRACE_STUB(sceRudpNetFlush,ok_void)
+TRACE_STUB(sceRudpNetReceived,ok_void)
+TRACE_STUB(sceRudpPollWait,ok_void)
+TRACE_STUB(sceRudpRead,ok_void)
+TRACE_STUB(sceRudpWrite,ok_void)
+#undef TRACE_STUB
+static ABI int32_t trace_sceNpGetState(int32_t user,int32_t *state) {
+    int32_t result=np_state(user,state);
+    fprintf(stderr,"NETTRACE sceNpGetState result=%d state=%d\n",result,result==0 && state ? *state : -1);
+    return result;
+}
+static ABI int32_t trace_sceNpGetOnlineId(int32_t user,NpOnlineId *id) {
+    int32_t result=np_online_id(user,id); net_trace_line(stderr,"sceNpGetOnlineId",result); return result;
+}
+static ABI int32_t trace_sceNpGetNpId(int32_t user,NpId *id) {
+    int32_t result=np_id(user,id); net_trace_line(stderr,"sceNpGetNpId",result); return result;
+}
+static ABI int32_t trace_sceNpCreateAsyncRequest(const NpAsyncParam *param) {
+    int32_t result=np_manager_create(param); net_trace_line(stderr,"sceNpCreateAsyncRequest",result); return result;
+}
+static ABI int32_t trace_sceNpPollAsync(int32_t id,int32_t *out) {
+    int32_t result=np_manager_poll(id,out); net_trace_line(stderr,"sceNpPollAsync",result); return result;
+}
+static ABI int32_t trace_sceNpDeleteRequest(int32_t id) {
+    int32_t result=np_manager_delete(id); net_trace_line(stderr,"sceNpDeleteRequest",result); return result;
+}
+static ABI int32_t trace_sceNpAbortRequest(int32_t id) {
+    int32_t result=np_manager_abort(id); net_trace_line(stderr,"sceNpAbortRequest",result); return result;
+}
+static ABI int32_t trace_sceNpCheckNpAvailability(int32_t id,const NpOnlineId *online) {
+    int32_t result=np_check_availability(id,online); net_trace_line(stderr,"sceNpCheckNpAvailability",result); return result;
+}
+static ABI int32_t trace_sceNpCheckPlus(int32_t id,const NpCheckPlusParam *param,NpCheckPlusResult *out) {
+    int32_t result=np_check_plus(id,param,out); net_trace_line(stderr,"sceNpCheckPlus",result); return result;
+}
+static ABI int32_t trace_sceNpAuthCreateAsyncRequest(const NpAsyncParam *param) {
+    int32_t result=np_auth_create(param); net_trace_line(stderr,"sceNpAuthCreateAsyncRequest",result); return result;
+}
+static ABI int32_t trace_sceNpAuthGetAuthorizationCode(int32_t id,const NpAuthCodeParam *param,NpAuthorizationCode *code,int32_t *issuer) {
+    int32_t result=np_auth_get_code(id,param,code,issuer); net_trace_line(stderr,"sceNpAuthGetAuthorizationCode",result); return result;
+}
+static ABI int32_t trace_sceNpAuthPollAsync(int32_t id,int32_t *out) {
+    int32_t result=np_auth_poll(id,out); net_trace_line(stderr,"sceNpAuthPollAsync",result); return result;
+}
+static ABI int32_t trace_sceNpAuthDeleteRequest(int32_t id) {
+    int32_t result=np_auth_delete(id); net_trace_line(stderr,"sceNpAuthDeleteRequest",result); return result;
+}
+static ABI int32_t trace_sceNpAuthAbortRequest(int32_t id) {
+    int32_t result=np_auth_abort(id); net_trace_line(stderr,"sceNpAuthAbortRequest",result); return result;
+}
+static ABI int32_t trace_sceNpGetParentalControlInfo(int32_t id,const NpOnlineId *online,int8_t *age,NpParentalInfo *info) {
+    int32_t result=np_parental_info(id,online,age,info); net_trace_line(stderr,"sceNpGetParentalControlInfo",result); return result;
+}
+static ABI int32_t trace_sceNpGetAccountCountry(const NpOnlineId *online,NpCountryCode *country) {
+    int32_t result=np_account_country(online,country); net_trace_line(stderr,"sceNpGetAccountCountry",result); return result;
+}
+static ABI int32_t trace_sceNpGetAccountLanguage(int32_t id,const NpOnlineId *online,NpLanguageCode *language) {
+    int32_t result=np_account_language(id,online,language); net_trace_line(stderr,"sceNpGetAccountLanguage",result); return result;
+}
+static ABI int32_t trace_sceNpRegisterStateCallback(void *callback,void *arg) {
+    int32_t result=np_register(callback,arg); net_trace_line(stderr,"sceNpRegisterStateCallback",result); return result;
+}
+static ABI int32_t trace_sceNpRegisterPlusEventCallback(void *callback,void *arg) {
+    int32_t result=np_register(callback,arg); net_trace_line(stderr,"sceNpRegisterPlusEventCallback",result); return result;
+}
+static ABI int32_t trace_sceNetCtlGetState(int32_t *state) {
+    int32_t result=netctl_state(state);
+    fprintf(stderr,"NETTRACE sceNetCtlGetState result=%d state=%d\n",result,state ? *state : -1);
+    return result;
+}
+static ABI int32_t trace_sceNetCtlGetInfo(int code,void *info) {
+    int32_t result=netctl_info(code,info);
+    fprintf(stderr,"NETTRACE sceNetCtlGetInfo code=%d result=%d\n",code,result);
+    return result;
+}
+static ABI int32_t trace_sceNetSocket(const char *name,int family,int type,int protocol) {
+    int32_t result=net_socket(name,family,type,protocol); net_trace_line(stderr,"sceNetSocket",result); return result;
+}
+static ABI int32_t trace_sceNetConnect(int socket) {
+    int32_t result=net_connect(socket); net_trace_line(stderr,"sceNetConnect",result); return result;
+}
+static ABI int32_t trace_sceNetSend(int socket,const void *data,uint64_t length) {
+    int32_t result=net_send(socket,data,length); net_trace_line(stderr,"sceNetSend",result); return result;
+}
+static ABI int32_t trace_sceNetSendto(int socket,const void *data,uint64_t length) {
+    int32_t result=net_send(socket,data,length); net_trace_line(stderr,"sceNetSendto",result); return result;
+}
+static ABI int32_t trace_sceNetRecv(void) {
+    int32_t result=net_would_block(); net_trace_line(stderr,"sceNetRecv",result); return result;
+}
+static ABI int32_t trace_sceNetRecvfrom(void) {
+    int32_t result=net_would_block(); net_trace_line(stderr,"sceNetRecvfrom",result); return result;
+}
+static const RuntimeExport trace_exports[]={
+    {"sceNpGetState",trace_sceNpGetState}, {"sceNetCtlGetState",trace_sceNetCtlGetState},
+    {"sceNetCtlGetInfo",trace_sceNetCtlGetInfo},
+    {"sceNpGetOnlineId",trace_sceNpGetOnlineId}, {"sceNpGetNpId",trace_sceNpGetNpId},
+    {"sceNpCreateAsyncRequest",trace_sceNpCreateAsyncRequest}, {"sceNpPollAsync",trace_sceNpPollAsync},
+    {"sceNpDeleteRequest",trace_sceNpDeleteRequest}, {"sceNpAbortRequest",trace_sceNpAbortRequest},
+    {"sceNpGetParentalControlInfo",trace_sceNpGetParentalControlInfo},
+    {"sceNpGetAccountCountry",trace_sceNpGetAccountCountry}, {"sceNpGetAccountLanguage",trace_sceNpGetAccountLanguage},
+    {"sceNpRegisterStateCallback",trace_sceNpRegisterStateCallback},
+    {"sceNpRegisterPlusEventCallback",trace_sceNpRegisterPlusEventCallback},
+    {"sceNpSetNpTitleId",trace_sceNpSetNpTitleId},
+    {"sceNpSetContentRestriction",trace_sceNpSetContentRestriction},
+    {"sceNpMatching2Initialize",trace_sceNpMatching2Initialize},
+    {"sceNetSocket",trace_sceNetSocket}, {"sceNetConnect",trace_sceNetConnect},
+    {"sceNetSend",trace_sceNetSend}, {"sceNetSendto",trace_sceNetSendto},
+    {"sceNetRecv",trace_sceNetRecv}, {"sceNetRecvfrom",trace_sceNetRecvfrom},
+    {"sceHttpSendRequest",trace_sceHttpSendRequest},
+    {"sceNpCheckNpAvailability",trace_sceNpCheckNpAvailability},
+    {"sceNpCheckPlus",trace_sceNpCheckPlus},
+    {"sceNpAuthGetAuthorizationCode",trace_sceNpAuthGetAuthorizationCode},
+    {"sceNpAuthCreateAsyncRequest",trace_sceNpAuthCreateAsyncRequest}, {"sceNpAuthPollAsync",trace_sceNpAuthPollAsync},
+    {"sceNpAuthDeleteRequest",trace_sceNpAuthDeleteRequest}, {"sceNpAuthAbortRequest",trace_sceNpAuthAbortRequest},
+    {"sceNpWebApiCreateContext",trace_sceNpWebApiCreateContext},
+    {"sceNpWebApiSendRequest",trace_sceNpWebApiSendRequest},
+    {"sceNpMatching2CreateContext",trace_sceNpMatching2CreateContext},
+    {"sceNpMatching2ContextStart",trace_sceNpMatching2ContextStart},
+    {"sceNpMatching2CreateJoinRoom",trace_sceNpMatching2CreateJoinRoom},
+    {"sceNpMatching2JoinRoom",trace_sceNpMatching2JoinRoom},
+    {"sceNpMatching2SearchRoom",trace_sceNpMatching2SearchRoom},
+    {"sceNpMatching2GetWorldInfoList",trace_sceNpMatching2GetWorldInfoList},
+    {"sceRudpInit",trace_sceRudpInit}, {"sceRudpCreateContext",trace_sceRudpCreateContext},
+    {"sceRudpBind",trace_sceRudpBind},
+    {"sceRudpInitiate",trace_sceRudpInitiate}, {"sceRudpRead",trace_sceRudpRead},
+    {"sceRudpProcessEvents",trace_sceRudpProcessEvents},
+    {"sceRudpNetFlush",trace_sceRudpNetFlush},
+    {"sceRudpNetReceived",trace_sceRudpNetReceived},
+    {"sceRudpPollWait",trace_sceRudpPollWait},
+    {"sceRudpWrite",trace_sceRudpWrite},
+};
 static const RuntimeExport exports[]={
     {"sceUserServiceInitialize",user_initialize}, {"sceUserServiceTerminate",user_terminate},
     {"sceUserServiceGetInitialUser",user_initial}, {"sceUserServiceGetLoginUserIdList",user_list},
@@ -729,18 +1181,18 @@ static const RuntimeExport exports[]={
     {"sceHttpSetEpoll",ok_void}, {"sceHttpUnsetEpoll",ok_void}, {"sceHttpWaitRequest",http_wait},
     {"sceHttpGetStatusCode",http_fail}, {"sceHttpGetResponseContentLength",http_fail},
     {"sceHttpReadData",http_fail},
-    {"sceNpGetState",np_state}, {"sceNpGetOnlineId",np_signed_out}, {"sceNpGetNpId",np_signed_out},
+    {"sceNpGetState",np_state}, {"sceNpGetOnlineId",np_online_id}, {"sceNpGetNpId",np_id},
     {"sceNpRegisterStateCallback",np_register}, {"sceNpUnregisterStateCallback",ok_void},
     {"sceNpRegisterGamePresenceCallback",np_register_void}, {"sceNpRegisterPlusEventCallback",np_register},
     {"sceNpUnregisterPlusEventCallback",ok_void}, {"sceNpCheckCallback",ok_void},
     {"sceNpSetNpTitleId",ok_void}, {"sceNpNotifyPlusFeature",ok_void}, {"sceNpSetContentRestriction",ok_void},
-    {"sceNpCreateAsyncRequest",np_request}, {"sceNpDeleteRequest",ok_void}, {"sceNpAbortRequest",ok_void},
-    {"sceNpPollAsync",np_poll}, {"sceNpCheckNpAvailability",np_signed_out},
-    {"sceNpGetParentalControlInfo",np_signed_out}, {"sceNpCheckPlus",np_signed_out},
+    {"sceNpCreateAsyncRequest",np_manager_create}, {"sceNpDeleteRequest",np_manager_delete}, {"sceNpAbortRequest",np_manager_abort},
+    {"sceNpPollAsync",np_manager_poll}, {"sceNpCheckNpAvailability",np_check_availability},
+    {"sceNpGetParentalControlInfo",np_parental_info}, {"sceNpCheckPlus",np_check_plus},
     {"sceNpGetGamePresenceStatus",np_signed_out},
     {"sceNpCmpNpId",np_compare}, {"sceNpCmpOnlineId",np_compare},
-    {"sceNpAuthCreateAsyncRequest",np_request}, {"sceNpAuthDeleteRequest",ok_void},
-    {"sceNpAuthPollAsync",np_poll}, {"sceNpAuthGetAuthorizationCode",np_signed_out},
+    {"sceNpAuthCreateAsyncRequest",np_auth_create}, {"sceNpAuthDeleteRequest",np_auth_delete},
+    {"sceNpAuthPollAsync",np_auth_poll}, {"sceNpAuthGetAuthorizationCode",np_auth_get_code},
     {"sceNpLookupCreateTitleCtx",np_request}, {"sceNpLookupDeleteTitleCtx",ok_void},
     {"sceNpLookupCreateAsyncRequest",np_request_ctx}, {"sceNpLookupDeleteRequest",ok_void},
     {"sceNpLookupAbortRequest",ok_void}, {"sceNpLookupPollAsync",np_poll}, {"sceNpLookupNpId",np_signed_out},
@@ -826,7 +1278,7 @@ static const RuntimeExport exports[]={
     {"sceHttpsLoadCert",ok_void}, {"sceHttpSetAuthInfoCallback",ok_void}, {"sceHttpSetRecvTimeOut",ok_void},
     {"sceHttpsSetSslCallback",ok_void}, {"sceHttpGetAllResponseHeaders",http_fail},
     {"sceNpGetAccountId",np_account_id}, {"sceNpGetAccountCountry",np_account_country},
-    {"sceNpGetAccountLanguage",np_account_language}, {"sceNpAuthAbortRequest",ok_void},
+    {"sceNpGetAccountLanguage",np_account_language}, {"sceNpAuthAbortRequest",np_auth_abort},
     {"sceNpWebApiCreateHandle",http_object}, {"sceNpWebApiDeleteHandle",ok_void},
     {"sceNpWebApiAddHttpRequestHeader",np_signed_out},
     {"sceNpWebApiCreateServicePushEventFilter",np_signed_out}, {"sceNpWebApiDeleteServicePushEventFilter",ok_void},
@@ -866,4 +1318,11 @@ static const RuntimeExport exports[]={
     {"scePlayGoSetLanguageMask",playgo_set_languages}, {"scePlayGoPrefetch",playgo_prefetch},
     {"scePlayGoGetToDoList",playgo_get_todo},
 };
-uintptr_t runtime_services_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
+uintptr_t runtime_services_resolve(const char *name) {
+    const char *trace=getenv("KZSF_NET_TRACE");
+    if (!trace || strcmp(trace,"0")) {
+        uintptr_t wrapper=RUNTIME_LOOKUP(trace_exports,name);
+        if (wrapper) return wrapper;
+    }
+    return RUNTIME_LOOKUP(exports,name);
+}

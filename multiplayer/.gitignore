@@ -1,0 +1,11 @@
+# Runtime data of the private multiplayer scripts (keys, profiles, rooms).
+local-profile/
+room-host/
+host-connection/
+connection/
+connection-backups/
+Host-connection.zip
+server/data/
+.*.lock
+.*-stage-*/
+__pycache__/

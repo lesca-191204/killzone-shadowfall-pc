@@ -41,7 +41,7 @@ FROZEN = getattr(sys, 'frozen', False)
 PORT_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
 
-VERSION = '0.7.0'
+VERSION = '0.8.0'
 TITLE_ID = 'CUSA00190'
 # Other releases of the game players run (their languages), accepted untested: the port was built and
 # tested on CUSA00190. Every one must be at version 01.81.

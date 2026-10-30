@@ -1121,8 +1121,11 @@ def game_env(settings, graphics, needs_update):
     # scene renders smaller (src/scene_res_hook.h), the UI and videos stay at the output size.
     quality = os.environ.get('GOW3_UPSCALE_QUALITY') or settings.get('upscale_quality', 'native')
     quality = quality if quality in UPSCALE_QUALITIES else 'native'
+    # Multiplayer rooms (KZSF_PRIVATE_HTTP, launch_online_game): the full scene, FSR / DLSS as
+    # anti-aliasing (the reduced-scene modes left the respawn menu's background in a corner).
+    online = bool(os.environ.get('KZSF_PRIVATE_HTTP'))
     native_aa = graphics['render_resolution'] == 'native' and (
-        frame_gen != 'off' or (quality != 'native' and method != 'patch'))
+        frame_gen != 'off' or (method != 'patch' and (quality != 'native' or online)))
     if native_aa:
         output = '1920x1080'
     # Quality modes: the scene renders smaller (GOW3_RENDER_RES, read by the loader) and FSR / DLSS
@@ -1197,8 +1200,8 @@ def launch_online_game(settings, graphics, online):
     for name in ('launcher.json', 'settings.ini'):
         if (USER_DIR / name).is_file():
             shutil.copyfile(USER_DIR / name, user / name)
-    # The full scene at the game's own size and anti-aliasing: with an upscaler quality mode the
-    # respawn menu drew its 3D background at the reduced size in a corner (gameplay was fine).
+    # The full scene (game_env then keeps FSR / DLSS as anti-aliasing): with a reduced-scene quality
+    # mode the respawn menu drew its 3D background in a corner (gameplay was fine).
     options = json.loads((user / 'launcher.json').read_text(encoding='utf-8')) if (user / 'launcher.json').is_file() else {}
     options['upscale_quality'] = 'native'
     (user / 'launcher.json').write_text(json.dumps(options, indent=2), encoding='utf-8')

@@ -290,7 +290,8 @@ join the same Radmin network; the page shows **"Radmin VPN connected"** when it'
 > 💾 **Two PLAY buttons, two saves.** **PLAY** opens the campaign with your save. **PLAY IN THE
 > ROOM** uses a save of its own and starts at the main menu without campaign progress: your campaign
 > was not touched. In multiplayer everything is unlocked (max rank, weapons, abilities, challenges),
-> the game renders at full resolution with its own anti-aliasing, and the new profile takes the
+> the game renders at full resolution (DLSS / FSR as anti-aliasing; the reduced-resolution
+> quality modes are campaign-only for now), and the new profile takes the
 > language chosen in *Advanced → Game*. The host's launcher must stay open while you play.
 
 Based on a community member's private multiplayer prototype (see [Credits](#-credits--créditos)).
@@ -683,7 +684,8 @@ a la misma red de Radmin; la página muestra **"Radmin VPN conectado"** cuando e
 > 💾 **Dos botones de JUGAR, dos partidas guardadas.** **JUGAR** abre la campaña con tu partida.
 > **JUGAR EN LA SALA** usa una partida aparte y arranca en el menú principal sin progreso de
 > campaña: tu campaña no se tocó. En multijugador está todo desbloqueado (rango máximo, armas,
-> habilidades, desafíos), el juego se ve a resolución completa con su propio anti-aliasing y el
+> habilidades, desafíos), el juego se ve a resolución completa (DLSS / FSR como anti-aliasing; los modos de calidad que
+> bajan la resolución son solo para la campaña por ahora) y el
 > perfil nuevo toma el idioma elegido en *Avanzado → Juego*. El launcher del host tiene que quedar
 > abierto mientras juegan.
 

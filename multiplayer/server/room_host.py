@@ -157,7 +157,7 @@ def discover_identity(executable=None, host_ip=None) -> HostIdentity:
 
 def find_openssl(root=None) -> str:
     root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
-    candidates = [root / 'port-source/out/openssl.exe',
+    candidates = [root / 'openssl/openssl.exe', root / 'port-source/out/openssl.exe',
                   shutil.which('openssl'), 'C:/msys64/clang64/bin/openssl.exe',
                   'C:/Program Files/Git/usr/bin/openssl.exe', 'C:/msys64/usr/bin/openssl.exe']
     for candidate in candidates:
@@ -401,11 +401,20 @@ def export_connection(prepared: PreparedHost, destination: Path) -> Path:
     return destination
 
 
+def python_command(script: Path) -> list[str]:
+    """A script of these folders as its own process: Python, or the port launcher's executable
+    (its --script role) when this runs inside it."""
+    if getattr(sys, 'frozen', False):
+        return [sys.executable, '--script', str(script)]
+    return [sys.executable, '-u', '-B', str(script)]
+
+
 def gateway_command(root: Path, prepared: PreparedHost) -> list[str]:
+    """root: these scripts' folder; the rooms are kept beside the host key (room-host/)."""
     identity = validate_identity(prepared.identity)
-    return [sys.executable, '-u', str(root / 'server' / 'room_gateway.py'),
+    return [*python_command(root / 'server' / 'room_gateway.py'),
             '--host', identity.ipv4, '--port', str(PORT), '--cert', str(prepared.cert),
-            '--key', str(prepared.key), '--data-root', str(root / 'room-host' / 'rooms')]
+            '--key', str(prepared.key), '--data-root', str(prepared.key.parent / 'rooms')]
 
 
 def main(argv=None):

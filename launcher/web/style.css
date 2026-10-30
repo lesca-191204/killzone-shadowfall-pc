@@ -292,3 +292,14 @@ select option { background: #1a252d; color: var(--text); }
   .keys-grid { grid-template-columns: 1fr; }
   .row { grid-template-columns: minmax(0, 1fr) 260px; }
 }
+
+/* multiplayer (beta) */
+.nav-badge { margin-left: auto; font: 700 9.5px/1 var(--font); letter-spacing: 0.1em; padding: 3px 6px;
+  border-radius: 5px; background: var(--accent-soft); color: var(--accent); }
+input.text { flex: 1; min-width: 0; background: var(--field); border: 1px solid var(--line); color: var(--text);
+  border-radius: var(--radius-sm); padding: 9px 14px; outline: none; font: inherit; font-size: 13.5px; }
+input.text:focus-visible { border-color: var(--accent); }
+.page-actions.inline { justify-content: flex-start; gap: 10px; margin: 0; padding: 4px 20px 18px; flex-wrap: wrap; }
+.room { display: flex; align-items: center; gap: 16px; padding: 8px 20px 6px; }
+.room-code { font: 700 30px/1 var(--font); letter-spacing: 0.16em; color: var(--accent); user-select: text; }
+.btn[disabled] { opacity: 0.5; cursor: default; }

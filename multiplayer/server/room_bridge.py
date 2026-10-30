@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
 import re
 import ssl
@@ -363,7 +364,7 @@ async def main(args):
     bridge = RoomBridge(host, port, ca=args.ca,
                         ports=(0, 0, 0) if args.test_ephemeral_ports else (17800, 17801, 17802),
                         profile_directory=None if args.test_ephemeral_ports else
-                        Path(__file__).resolve().parents[1] / 'local-profile')
+                        Path(os.environ.get('KZSF_ONLINE_DIR') or Path(__file__).resolve().parents[1]) / 'local-profile')
     try:
         ready = await bridge.start(args.join.upper() if args.join is not None else None, nickname=args.nickname)
         print(json.dumps(ready), flush=True)

@@ -28,7 +28,9 @@ out/pyenv/Scripts/python.exe -m pip install -q --disable-pip-version-check pyins
 # The scripts run inside the launcher executable (--script): the standard modules they import come along.
 hidden=()
 for module in argparse base64 collections hashlib json re shutil socket struct tempfile threading uuid \
-              xml.etree.ElementTree urllib.request ctypes.wintypes iced_x86; do
+              xml.etree.ElementTree urllib.request ctypes.wintypes iced_x86 \
+              asyncio ssl http.server http.client http.cookies ipaddress csv zipfile zlib gzip secrets \
+              dataclasses copy datetime queue urllib.parse email.parser contextlib; do
     hidden+=(--hidden-import "$module")
 done
 out/pyenv/Scripts/python.exe -m PyInstaller --noconfirm --clean --log-level WARN --windowed --copy-metadata pillow \
@@ -62,6 +64,15 @@ else
     echo 'Note: DLSS not packaged (run packaging/windows/build_dlss_kzsf.sh first)' >&2
 fi
 cp -r scripts "$dest/"
+# Private multiplayer (beta): the room scripts (run inside the launcher executable, --script), without
+# their tests or any runtime data, and OpenSSL for the host's certificate.
+mkdir -p "$dest/multiplayer/server/fixtures" "$dest/multiplayer/openssl"
+cp multiplayer/*.py multiplayer/README.md "$dest/multiplayer/"
+cp multiplayer/server/fixtures/* "$dest/multiplayer/server/fixtures/"
+for f in multiplayer/server/*.py; do
+    [[ $(basename "$f") == test_* ]] || cp "$f" "$dest/multiplayer/server/"
+done
+cp /clang64/bin/openssl.exe /clang64/bin/libcrypto-3-x64.dll /clang64/bin/libssl-3-x64.dll "$dest/multiplayer/openssl/"
 cp run.py LICENSE "$dest/"
 # The render resolution patches (tools/make_kzsf_res_patches.py): our own file, no game data.
 cp patches/Killzone_Shadow_Fall.xml "$dest/patches/"
@@ -88,7 +99,7 @@ rm -f "$dest/_internal/pythonnet/runtime/Python.Runtime.xml"
 forbidden=$(find "$dest" \( -iname eboot.bin -o -iname sce_module -o -iname sce_sys -o -iname savedata \
     -o -iname user -o -iname cache -o -iname '*.log' -o -iname '*.ini' -o -iname launcher.json \
     -o \( -path "$dest/fsr4_shaders/*" -not -path "$dest/fsr4_shaders/opt/*" -not -name LICENSE-FSR4-v07.txt -not -name opt \) \
-    -o \( -iname '*.spv' -not -path "$dest/fsr4_shaders/opt/*" \) -o -iname '*.pkg' -o -iname '*.sprx' -o -iname '*.prx' -o \( -iname '*.xml' -not -path "$dest/patches/Killzone_Shadow_Fall.xml" \) \) -print)
+    -o \( -iname '*.spv' -not -path "$dest/fsr4_shaders/opt/*" \) -o -iname '*.pkg' -o -iname '*.sprx' -o -iname '*.prx' -o \( -iname '*.xml' -not -path "$dest/patches/Killzone_Shadow_Fall.xml" -not -path "$dest/multiplayer/server/fixtures/*" \) \) -print)
 if [[ -n $forbidden ]]; then
     echo "Package holds files that must not ship:" >&2
     echo "$forbidden" >&2

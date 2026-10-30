@@ -588,6 +588,16 @@ def attach_stdio():
             except OSError:
                 stream = None
         setattr(sys, name, stream or open(os.devnull, 'w'))
+    # A pipe from the parent (the multiplayer room bridge reads "stop" from it).
+    if sys.stdin is None:
+        handle = ctypes.windll.kernel32.GetStdHandle(-10)
+        stream = None
+        if handle and handle != ctypes.c_void_p(-1).value:
+            try:
+                stream = open(msvcrt.open_osfhandle(handle, os.O_RDONLY), 'r', encoding='utf-8', errors='replace')
+            except OSError:
+                stream = None
+        sys.stdin = stream or open(os.devnull)
 
 
 def run_role(argv):
@@ -600,6 +610,9 @@ def run_role(argv):
             pass
     if argv[0] == '--script':
         path, sys.argv = argv[1], argv[1:]
+        # As python does: the script's own folder first (the multiplayer room scripts import their
+        # neighbours).
+        sys.path.insert(0, str(Path(path).resolve().parent))
     else:
         path = str(PORT_DIR / 'run.py')
         sys.argv = [path, *argv[1:]]

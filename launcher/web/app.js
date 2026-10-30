@@ -323,6 +323,8 @@ function onlinePage() {
       h('button.btn.ghost', { onclick: () => api().online_info().then(onlineAnswer) }, icon('reset'), T('online_refresh')),
       h('button.btn', { onclick: () => api().open_url('radmin') }, icon('download'), T('online_get_radmin')))));
   const busy = o.busy || ui.onlineBusy;
+  const saves = h('section.card', h('div.card-head', h('div.card-title', T('online_saves'))),
+    h('div.card-help', h('div.help.open', T('online_saves_help'))));
   if (o.room) {
     const room = o.room;
     out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_room'))),
@@ -330,8 +332,8 @@ function onlinePage() {
         h('div.room-code', room.code),
         h('button.btn', { onclick: () => { navigator.clipboard.writeText(room.code).then(() => toast(T('online_copied'))); } },
           icon('file'), T('online_copy'))),
-      h('div.card-help', h('div.help', T(room.host ? 'online_you_host' : 'online_you_join').replace('{nickname}', room.nickname))),
-      room.host ? [h('div.card-help', h('div.help', T('online_send'))),
+      h('div.card-help', h('div.help.open', T(room.host ? 'online_you_host' : 'online_you_join').replace('{nickname}', room.nickname))),
+      room.host ? [h('div.card-help', h('div.help.open', T('online_send'))),
         h('div.page-actions.inline', h('button.btn', { onclick: async () => {
           const r = await api().online_save_connection();
           if (r && r.text) toast(r.text);
@@ -345,7 +347,8 @@ function onlinePage() {
         h('button.btn.danger', { disabled: S.playing, onclick: () => api().online_close().then(onlineAnswer) },
           icon('x'), T(room.host ? 'online_close' : 'online_leave')))));
     out.push(h('section.card', h('div.card-head', h('div.card-title', T('online_steps'))),
-      h('div.card-help', h('div.help', T('online_steps_help')))));
+      h('div.card-help', h('div.help.open', T('online_steps_help')))));
+    out.push(saves);
     return out;
   }
   const nick = textInput(o.nickname, { maxlength: 16, placeholder: 'Lesca' });
@@ -369,6 +372,7 @@ function onlinePage() {
     h('div.folder', code,
       h('button.btn.primary', { disabled: busy, onclick: start(() => api().online_join(code.value.trim(), nick.value.trim())) },
         busy ? T('online_working') : T('online_join_button')))));
+  out.push(saves);
   return out;
 }
 

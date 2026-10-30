@@ -264,4 +264,12 @@
             <Line Type="bytes" Address="0x012c47dc" Value="31c0" Pattern="48 8d 9d 48 ff ff ff 48 8d 35 53 84 3a 00 48 89 df e8 1d e8 3d ff 4c 89 f7 48 8b 07 ff 50 20 34 01 0f b6 d0 4c 89 e7 48 89 de e8 64 a5 54 ff 41 08 45 08 48 89 df e8 98 ec 3d ff" At="31"/>
         </PatchList>
     </Metadata>
+    <!-- Online matches at 60 Hz ask the renderer for its half-width reprojection (960 wide, rebuilt) and
+         turn the game's TAA off (0xd64aa0 -> 0x510e50 / 0x50a1f0); the port's upscalers expect the full
+         scene: keep full width and TAA as in the campaign. -->
+    <Metadata Title="Killzone Shadow Fall" Name="Private Multiplayer - Full Width" Note="Online matches render the full scene, as the campaign (no half-width reprojection)." Author="lesca" PatchVer="1.0" AppVer="01.81" AppElf="eboot.bin" isEnabled="false">
+        <PatchList>
+            <Line Type="bytes" Address="0x00d64c2b" Value="b3019030c090" Pattern="41 83 fe 3c 0f 95 c3 0f 94 c0 4c 8d 25 ?? ?? ?? ?? 49 8b 7c 24 28 0f b6 f0 e8" At="4"/>
+        </PatchList>
+    </Metadata>
 </Patch>

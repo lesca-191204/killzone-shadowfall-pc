@@ -18,7 +18,7 @@ import time
 
 HERE = Path(__file__).resolve().parent
 SERVER = HERE / 'server'
-PATCHES = 'Private Multiplayer - HUD Visibility;Private Multiplayer - Full Unlocks'
+PATCHES = 'Private Multiplayer - HUD Visibility;Private Multiplayer - Full Unlocks;Private Multiplayer - Full Width'
 SERVICES = ('private_service.py', 'turbine_relay.py', 'ping_service.py')
 
 

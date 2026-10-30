@@ -36,7 +36,7 @@ from connection_bundle import activate_connection, read_bundle_zip  # noqa: E402
 from local_profile import LocalProfile  # noqa: E402
 from player_identity import player_number, validate_nickname  # noqa: E402
 
-PATCHES = 'Private Multiplayer - HUD Visibility;Private Multiplayer - Full Unlocks'
+PATCHES = 'Private Multiplayer - HUD Visibility;Private Multiplayer - Full Unlocks;Private Multiplayer - Full Width'
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 
 

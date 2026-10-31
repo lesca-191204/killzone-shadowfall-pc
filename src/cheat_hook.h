@@ -77,10 +77,13 @@ static inline int gow3_player_entity(uintptr_t entity, uintptr_t base, Gow3Cheat
     unsigned char flag = 0;
     if (!entity || depth >= 4 || !read(entity, &vtable, 8) || !read(vtable + 0x140, &method, 8)) return 0;
     if (method == base + 0xa7ab20) {
-        if (!read(entity + 0x282, &flag, 1)) return 0;
-        if (flag) return 1;
+        /* 0xa7ab20 only says "has a controller", which AI soldiers have too (issue #110). The
+         * local player's controller (vtable+0x138 = 0xb67220 -> [entity+0x948]) has [+0xa0] set
+         * and [+0xa1] clear, as Entity_ExportedIsPlayer's last answer checks. */
+        unsigned char local = 0;
         if (!read(vtable + 0x138, &method, 8) || method != base + 0xb67220) return 0;
-        return read(entity + 0x948, &controller, 8) && controller != 0;
+        if (!read(entity + 0x948, &controller, 8) || !controller) return 0;
+        return read(controller + 0xa0, &local, 1) && local && read(controller + 0xa1, &flag, 1) && !flag;
     }
     const size_t user = method == base + 0xa74980 ? 0x598 : method == base + 0xadb8f0 ? 0x580 : 0;
     if (!user || !read(entity + user, &controller, 8) || controller < 0x48) return 0;

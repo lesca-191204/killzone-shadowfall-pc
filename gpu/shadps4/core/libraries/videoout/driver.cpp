@@ -667,15 +667,32 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
     const bool uncapped = EmulatorSettings.GetVblankFrequency() == 480;
     const bool fixed_limit = std::getenv("GOW3_FPS_LIMIT") && !uncapped;
     const int startup_menu_limit = Gow3Settings::Get().fps_limit;
+    // gow3: with frame generation the game's frames are capped so that they and the generated
+    // ones fit the display (a little under its refresh rate, as Reflex does with DLSS Frame
+    // Generation): faster, the display drops frames unevenly and it feels like the base rate
+    // (issue #106).
+    const auto frame_gen_cap = [] -> u32 {
+        const auto& s = Gow3Settings::Get();
+        if (s.frame_gen == Gow3Settings::FrameGenOff) {
+            return 0;
+        }
+        const int shown = s.frame_gen == Gow3Settings::FrameGenDlss
+                              ? std::clamp(s.frame_gen_multiplier.load(), 2, 4) : 2;
+        const double hz = Gow3DisplayRefreshHz();
+        return u32(std::max(30.0, (hz - hz * hz / 3600.0) / shown));
+    };
     const auto current_limit = [&] {
         const auto& s = Gow3Settings::Get();
+        u32 limit;
         if (uncapped) {
-            const int limit = s.fps_limit;
-            return limit == startup_menu_limit ? EmulatorSettings.GetFrameLimit()
-                                               : u32(std::max(limit, 0));
+            const int menu = s.fps_limit;
+            limit = menu == startup_menu_limit ? EmulatorSettings.GetFrameLimit() : u32(std::max(menu, 0));
+        } else {
+            limit = fixed_limit ? EmulatorSettings.GetFrameLimit()
+                                : u32(Gow3Graphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
         }
-        return fixed_limit ? EmulatorSettings.GetFrameLimit()
-                           : u32(Gow3Graphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
+        const u32 cap = frame_gen_cap();
+        return cap && (!limit || limit > cap) ? cap : limit;
     };
     u32 frame_limit = current_limit();
     auto frame_period = frame_limit ? std::chrono::nanoseconds(1000000000 / frame_limit)

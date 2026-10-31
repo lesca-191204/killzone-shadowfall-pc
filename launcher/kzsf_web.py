@@ -754,7 +754,7 @@ class Api:
     def online_choose_connection(self):
         import webview
         result = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False,
-                                                 file_types=('Host-connection (*.zip)', 'All files (*.*)'))
+                                                 file_types=('Host connection (*.zip)', 'All files (*.*)'))
         if result:
             self._connection = str(result[0] if isinstance(result, (list, tuple)) else result)
         return self.online_info()

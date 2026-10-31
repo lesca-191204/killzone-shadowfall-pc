@@ -41,7 +41,7 @@ FROZEN = getattr(sys, 'frozen', False)
 PORT_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
 
-VERSION = '0.8.0'
+VERSION = '0.8.1'
 TITLE_ID = 'CUSA00190'
 # Other releases of the game players run (their languages), accepted untested: the port was built and
 # tested on CUSA00190. Every one must be at version 01.81.
@@ -1966,6 +1966,11 @@ class Launcher:
             return
         if event.keysym == 'Escape':
             self.cancel_capture()
+            return
+        # With NumLock on, Tk names the keypad digits like the top row ("8"); Windows' virtual
+        # key codes VK_NUMPAD0..9 (0x60-0x69) tell them apart (issue #103).
+        if WINDOWS and 0x60 <= event.keycode <= 0x69:
+            self.assign_key(f'Keypad {event.keycode - 0x60}')
             return
         self.assign_key(sdl_key_name(event.keysym))
 

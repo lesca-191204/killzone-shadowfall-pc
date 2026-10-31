@@ -457,7 +457,14 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
     device_info.getDeviceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr;
     device_info.queue = instance.GetGraphicsQueue();
     device_info.queueFamilyIndex = instance.GetGraphicsQueueFamilyIndex();
-    device_info.shaderFloat16Enabled = instance.IsShaderFloat16Enabled();
+    // RX 6600 / 6600 XT still lost the device once FSR 3.1 ran with the shared permutations
+    // (#102, #107): on AMD the FP32 set is used, GOW3_FSR_FP16=1 brings FP16 back.
+    {
+        const char* env = std::getenv("GOW3_FSR_FP16");
+        const bool amd = instance.GetVendorID() == 0x1002;
+        device_info.shaderFloat16Enabled =
+            instance.IsShaderFloat16Enabled() && (env ? env[0] == '1' : !amd);
+    }
     // With subgroup size control on a 32..64 lane GPU (AMD) FSR 3.1 picks its "LUT" shader
     // permutations, which no other vendor runs; RX 6600 lost the device in them (#68, #73).
     // Without it FSR reports 32 lanes and uses the size-agnostic set NVIDIA/Intel run.

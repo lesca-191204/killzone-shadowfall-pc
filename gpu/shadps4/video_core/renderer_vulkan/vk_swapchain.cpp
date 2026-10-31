@@ -269,18 +269,26 @@ void Swapchain::FindPresentMode() {
     }
 
     // gow3: VSync on is Fifo (no tearing, waits for the display); off is Mailbox when the
-    // driver has it, else Immediate (tearing allowed), else Fifo.
+    // driver has it, else Immediate (tearing allowed), else Fifo. With frame generation, off is
+    // Immediate first: Mailbox replaces a queued frame with the next one, so the generated
+    // frame, presented half a game frame before the game's own, was often never shown, and it
+    // keeps G-Sync / FreeSync from pacing the frames (issue #106).
     vsync = Gow3Settings::Get().vsync;
+    frame_gen = Gow3Settings::Get().frame_gen != Gow3Settings::FrameGenOff;
     const auto has = [&](vk::PresentModeKHR mode) { return std::ranges::find(modes, mode) != modes.cend(); };
+    const auto first = frame_gen ? vk::PresentModeKHR::eImmediate : vk::PresentModeKHR::eMailbox;
+    const auto second = frame_gen ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eImmediate;
     present_mode = vsync ? vk::PresentModeKHR::eFifo
-                   : has(vk::PresentModeKHR::eMailbox) ? vk::PresentModeKHR::eMailbox
-                   : has(vk::PresentModeKHR::eImmediate) ? vk::PresentModeKHR::eImmediate
-                                                         : vk::PresentModeKHR::eFifo;
-    std::printf("Swapchain: VSync %s (%s)\n", vsync ? "on" : "off", vk::to_string(present_mode).c_str());
+                   : has(first) ? first
+                   : has(second) ? second
+                                 : vk::PresentModeKHR::eFifo;
+    std::printf("Swapchain: VSync %s%s (%s)\n", vsync ? "on" : "off", frame_gen ? ", frame generation" : "",
+                vk::to_string(present_mode).c_str());
 }
 
 void Swapchain::UpdateVsync() {
-    if (Gow3Settings::Get().vsync == vsync) {
+    const auto& settings = Gow3Settings::Get();
+    if (settings.vsync == vsync && (settings.frame_gen != Gow3Settings::FrameGenOff) == frame_gen) {
         return;
     }
     {

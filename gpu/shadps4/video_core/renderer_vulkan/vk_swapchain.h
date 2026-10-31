@@ -130,6 +130,7 @@ private:
     vk::Format view_format;
     vk::PresentModeKHR present_mode;
     bool vsync = true; ///< the setting present_mode was chosen for
+    bool frame_gen = false; ///< frame generation on when present_mode was chosen
     vk::Extent2D extent;
     vk::SurfaceTransformFlagBitsKHR transform;
     vk::CompositeAlphaFlagBitsKHR composite_alpha;

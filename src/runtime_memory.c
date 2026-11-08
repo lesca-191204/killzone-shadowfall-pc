@@ -427,6 +427,45 @@ static int direct_range_allocated(uint64_t phys, uint64_t size) {
     return 1;
 }
 
+/* GOW3_TRACE_MAP=1: every direct allocation and mapping, and each map request. Otherwise only
+ * the first few: one 53-minute session printed 31,600 of them, each a write to the launcher's
+ * pipe (stdout is unbuffered) from a game thread, mostly while streaming. Read once. */
+enum { LOGGED_DIRECT = 16 };
+static int trace_map(void) {
+    static int value=-1;
+    if (value<0) value=getenv("GOW3_TRACE_MAP")!=NULL;
+    return value;
+}
+/* The lowest aligned start at or above `start` where `size` bytes overlap no used block, or
+ * UINT64_MAX when none ends by `end`. One pass over the used blocks sorted by address: the old
+ * search restarted the whole table after every overlap, about 2 ms per allocation with 2,000 or
+ * more live blocks (a nearly full pool, as Killzone keeps it: 4.8 of 4.83 GB in use), under the
+ * write lock the GPU thread needs for every draw. Same result, about a tenth of the time.
+ * Requires the write lock. */
+typedef struct { uint64_t start, end; } DirectSpan;
+static int span_order(const void *a, const void *b) {
+    const DirectSpan *x=a, *y=b;
+    return x->start<y->start ? -1 : x->start>y->start;
+}
+/* Not inlined: inlined into direct_allocate it crashed mingw-w64 GCC 13 (internal compiler error
+ * in choose_baseaddr, in another function of this file); one call per allocation either way. */
+__attribute__((noinline)) static uint64_t first_fit(uint64_t start, uint64_t end, uint64_t size,
+                                                    uint64_t alignment) {
+    static DirectSpan spans[LIMIT];
+    size_t n=0;
+    for (int i=0; i<LIMIT; ++i)
+        if (blocks[i].used && blocks[i].start+blocks[i].size>start && blocks[i].start<end)
+            spans[n++]=(DirectSpan){blocks[i].start,blocks[i].start+blocks[i].size};
+    qsort(spans,n,sizeof(*spans),span_order);
+    for (size_t i=0; i<n; ++i) {
+        if (start>end || size>end-start) return UINT64_MAX;
+        if (spans[i].end<=start) continue;
+        if (spans[i].start>=start+size) break; /* sorted: no later block reaches back */
+        start=align_up(spans[i].end,alignment);
+    }
+    return start>end || size>end-start ? UINT64_MAX : start;
+}
+
 static ABI uint64_t direct_size(void) { return POOL_SIZE; }
 static ABI int32_t direct_allocate(int64_t low, int64_t high, uint64_t size,
                                   uint64_t alignment, int type, int64_t *out) {
@@ -440,21 +479,15 @@ static ABI int32_t direct_allocate(int64_t low, int64_t high, uint64_t size,
     uint64_t start = align_up((uint64_t)low, alignment);
     int slot = -1;
     for (int i=0; i<LIMIT; ++i) if (!blocks[i].used) { slot=i; break; }
-    for (;;) {
-        if (slot<0 || start > end || size > end-start) { write_unlock(); return NO_SPACE; }
-        int overlap = 0;
-        for (int i=0; i<LIMIT; ++i) {
-            Block b = blocks[i];
-            if (b.used && start < b.start+b.size && b.start < start+size) {
-                start = align_up(b.start+b.size, alignment); overlap = 1; break;
-            }
-        }
-        if (!overlap) break;
-    }
+    if (slot<0 || start > end || size > end-start) { write_unlock(); return NO_SPACE; }
+    start = first_fit(start, end, size, alignment);
+    if (start == UINT64_MAX) { write_unlock(); return NO_SPACE; }
     blocks[slot] = (Block){start, size, type, 1}; *out = (int64_t)start;
-    ++allocations; live_bytes += size;
+    const size_t number = ++allocations; live_bytes += size;
     write_unlock();
-    printf("Runtime: direct allocation offset=0x%" PRIx64 ", size=%" PRIu64 " bytes, type=%d\n", start, size, type);
+    if (number <= LOGGED_DIRECT || trace_map())
+        printf("Runtime: direct allocation offset=0x%" PRIx64 ", size=%" PRIu64 " bytes, type=%d%s\n", start, size, type,
+               number == LOGGED_DIRECT && !trace_map() ? " (later ones: GOW3_TRACE_MAP=1)" : "");
     return 0;
 }
 static int32_t map_direct_locked(void **out, uint64_t size, int prot, int flags, int64_t physical, uint64_t alignment) {
@@ -467,14 +500,17 @@ static int32_t map_direct_locked(void **out, uint64_t size, int prot, int flags,
     return result;
 }
 static ABI int32_t direct_map(void **out, uint64_t size, int prot, int flags, int64_t physical, uint64_t alignment) {
-    if (getenv("GOW3_TRACE_MAP"))
+    if (trace_map())
         printf("Runtime: map direct request addr=%p size=0x%" PRIx64 " prot=0x%x flags=0x%x phys=0x%" PRIx64 " caller=%p\n",
                out ? *out : NULL,size,prot,flags,(uint64_t)physical,__builtin_return_address(0));
     write_lock();
     int32_t result=map_direct_locked(out,size,prot,flags,physical,alignment);
+    const size_t number=maps;
     write_unlock();
     flush_hooks();
-    if (!result) printf("Runtime: mapped direct memory %p, size=%" PRIu64 ", prot=0x%x\n", *out, size, prot);
+    if (!result && (number<=LOGGED_DIRECT || trace_map()))
+        printf("Runtime: mapped direct memory %p, size=%" PRIu64 ", prot=0x%x%s\n", *out, size, prot,
+               number==LOGGED_DIRECT && !trace_map() ? " (later ones: GOW3_TRACE_MAP=1)" : "");
     return result;
 }
 static ABI int32_t direct_map_named(void **out, uint64_t size, int prot, int flags, int64_t physical,

@@ -8,11 +8,24 @@
 #include <pthread.h>
 #include <errno.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #define ERR(n) ((int32_t)(UINT32_C(0x80020000)|(n)))
+/* Where a blocked thread sleeps, its own and reused across waits. Windows: an auto-reset event,
+ * so a wake-up set before the thread sleeps stays set (none is lost); one SetEvent and one wait
+ * per wake-up, where a winpthreads condition variable is two Win32 semaphores, a critical section
+ * and a gate, made and destroyed for every blocking wait before. Elsewhere: a condition variable
+ * on `lock`. */
+#ifdef _WIN32
+typedef HANDLE Parker;
+#else
+typedef pthread_cond_t *Parker;
+#endif
 typedef struct Waiter {
     int32_t need, result;
     int done;
-    pthread_cond_t event;
+    Parker parker;
     struct Waiter *next;
 } Waiter;
 typedef struct Sema {
@@ -23,28 +36,103 @@ typedef struct Sema {
     Waiter *first;
     struct Sema *next;
 } Sema;
+/* One lock for every semaphore, held only for short state changes: nothing below prints,
+ * allocates or creates host objects while holding it. Killzone's job scheduler parks its
+ * workers on kernel semaphores (JobSchedulerCPU::WaitForSemaphore in Guerrilla's 2013 PS4
+ * postmortem): a 53-minute session made 85,441 semaphores and 6.9 million wait/signal pairs.
+ * Each creation used to print under this lock and each blocking wait created and destroyed a
+ * condition variable (two Win32 semaphore objects in winpthreads), stalling every other job
+ * wake-up meanwhile. IDs hash into buckets: the long-lived job semaphores were created first,
+ * so a single newest-first list put them behind every short-lived one. */
+enum { BUCKETS = 256, LOGGED_CREATIONS = 8 };
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
-static Sema *registry;
+static Sema *registry[BUCKETS];
 static uint32_t next_id=1;
 static size_t created, deleted, acquired, signaled, timed_out;
+static Sema **bucket(uint32_t id) { return &registry[id&(BUCKETS-1)]; }
 static Sema *find(uint32_t id) {
-    for (Sema *s=registry;s;s=s->next) if (s->id==id) return s;
+    for (Sema *s=*bucket(id);s;s=s->next) if (s->id==id) return s;
     return NULL;
 }
 static void host_check(int e) {
     if (e) { fprintf(stderr,"STOP: semaphore host error %d\n",e); exit(21); }
 }
-/* Waits use this clock for their deadlines. winpthreads condition variables accept only
- * CLOCK_REALTIME (pthread_condattr_setclock(CLOCK_MONOTONIC) fails with EINVAL). */
-#ifdef _WIN32
-#define WAIT_CLOCK CLOCK_REALTIME
-#else
+/* GOW3_TRACE_SEMA: every creation and blocking wait (deadlock diagnosis). Read once. */
+static int trace_sema(void) {
+    static int value=-1;
+    if (value<0) value=getenv("GOW3_TRACE_SEMA")!=NULL;
+    return value;
+}
+/* Deadlines of kernel semaphore waits (also the Linux condition variables' clock). */
 #define WAIT_CLOCK CLOCK_MONOTONIC
-#endif
 static uint64_t now_ns(void) {
     struct timespec t;
     if (clock_gettime(WAIT_CLOCK,&t)) { perror("clock_gettime"); exit(1); }
     return (uint64_t)t.tv_sec*1000000000+(uint64_t)t.tv_nsec;
+}
+/* A thread waits on at most one semaphore at a time: its parker is made once (outside the
+ * lock) and freed when the thread ends. */
+static pthread_key_t parker_key;
+static pthread_once_t parker_once=PTHREAD_ONCE_INIT;
+static void parker_free(void *p) {
+#ifdef _WIN32
+    if (p) CloseHandle((HANDLE)p);
+#else
+    if (p) { pthread_cond_destroy(p); free(p); }
+#endif
+}
+static void parker_key_init(void) { host_check(pthread_key_create(&parker_key,parker_free)); }
+static Parker thread_parker(void) {
+    host_check(pthread_once(&parker_once,parker_key_init));
+    void *existing=pthread_getspecific(parker_key);
+    if (existing) return (Parker)existing;
+#ifdef _WIN32
+    Parker parker=CreateEventW(NULL,FALSE,FALSE,NULL);
+    if (!parker) { fprintf(stderr,"STOP: semaphore wait event (%lu)\n",GetLastError()); exit(21); }
+#else
+    Parker parker=malloc(sizeof(*parker));
+    if (!parker) { fputs("STOP: out of memory for a semaphore wait\n",stderr); exit(21); }
+    pthread_condattr_t attr;
+    host_check(pthread_condattr_init(&attr));
+    host_check(pthread_condattr_setclock(&attr,WAIT_CLOCK));
+    host_check(pthread_cond_init(parker,&attr));
+    host_check(pthread_condattr_destroy(&attr));
+#endif
+    host_check(pthread_setspecific(parker_key,(void *)parker));
+    return parker;
+}
+/* Requires `lock`. The waiter may run once `lock` is released. */
+static void wake(Waiter *w) {
+    w->done=1;
+#ifdef _WIN32
+    if (!SetEvent(w->parker)) { fprintf(stderr,"STOP: semaphore wake (%lu)\n",GetLastError()); exit(21); }
+#else
+    host_check(pthread_cond_signal(w->parker));
+#endif
+}
+/* Requires `lock`, which is released while sleeping. Returns ETIMEDOUT once `deadline` (when
+ * `timed`) has passed, otherwise 0 after a wake-up that may be spurious: callers check done. */
+static int park(Waiter *w,int timed,uint64_t deadline) {
+#ifdef _WIN32
+    /* Whole milliseconds rounded down, then the rest by yielding: Windows rounds a timed wait up
+     * to its timer tick (up to 15.6 ms), which made a 50 us timeout sleep that long. */
+    DWORD ms=INFINITE;
+    if (timed) {
+        const uint64_t now=now_ns();
+        if (now>=deadline) return ETIMEDOUT;
+        ms=(DWORD)((deadline-now)/1000000);
+    }
+    pthread_mutex_unlock(&lock);
+    const DWORD r=WaitForSingleObject(w->parker,ms);
+    if (r==WAIT_TIMEOUT && !ms) SwitchToThread();
+    pthread_mutex_lock(&lock);
+    if (r==WAIT_FAILED) { fprintf(stderr,"STOP: semaphore wait (%lu)\n",GetLastError()); exit(21); }
+    return 0;
+#else
+    if (!timed) return pthread_cond_wait(w->parker,&lock);
+    const struct timespec end={.tv_sec=(time_t)(deadline/1000000000),.tv_nsec=(long)(deadline%1000000000)};
+    return pthread_cond_timedwait(w->parker,&lock,&end);
+#endif
 }
 static ABI int32_t sem_create(uint32_t *out,const char *name,uint32_t attr,
                               int32_t initial,int32_t maximum,const void *options) {
@@ -55,12 +143,18 @@ static ABI int32_t sem_create(uint32_t *out,const char *name,uint32_t attr,
     pthread_mutex_lock(&lock);
     if (next_id==UINT32_MAX) { pthread_mutex_unlock(&lock); free(s); return ERR(28); }
     s->id=next_id++; s->attr=attr; s->count=s->initial=initial; s->maximum=maximum;
-    s->next=registry; registry=s; *out=s->id; ++created;
-    printf("Runtime: semaphore id=%u, attr=%u, initial=%d, max=%d\n",s->id,attr,initial,maximum);
+    Sema **head=bucket(s->id);
+    s->next=*head; *head=s; *out=s->id;
+    const uint32_t id=s->id;
+    const size_t number=++created;
     pthread_mutex_unlock(&lock);
+    if (number<=LOGGED_CREATIONS || trace_sema())
+        printf("Runtime: semaphore id=%u '%s', attr=%u, initial=%d, max=%d%s\n",id,name,attr,initial,maximum,
+               number==LOGGED_CREATIONS && !trace_sema() ? " (later ones: GOW3_TRACE_SEMA=1)" : "");
     return 0;
 }
 static int32_t wait_count(uint32_t id,int32_t need,uint32_t *timeout,int block) {
+    const Parker parker=block ? thread_parker() : (Parker)NULL;
     pthread_mutex_lock(&lock);
     Sema *s=find(id);
     int32_t result=0;
@@ -72,20 +166,14 @@ static int32_t wait_count(uint32_t id,int32_t need,uint32_t *timeout,int block) 
     else {
         /* Priority-ordered semaphores (attr 2) are served FIFO: there is no
            PS4 priority scheduler, host threads run at equal priority. */
-        if (getenv("GOW3_TRACE_SEMA")) fprintf(stderr,"Runtime: blocking wait on semaphore %u (need %d, count %d)\n",id,need,s->count); /* deadlock diagnosis */
-        Waiter w={.need=need};
-        pthread_condattr_t attr;
-        host_check(pthread_condattr_init(&attr));
-        host_check(pthread_condattr_setclock(&attr,WAIT_CLOCK));
-        host_check(pthread_cond_init(&w.event,&attr));
-        host_check(pthread_condattr_destroy(&attr));
+        if (trace_sema()) fprintf(stderr,"Runtime: blocking wait on semaphore %u (need %d, count %d)\n",id,need,s->count); /* deadlock diagnosis */
+        Waiter w={.need=need,.parker=parker};
         Waiter **tail=&s->first;
         while (*tail) tail=&(*tail)->next;
         *tail=&w; ++s->active;
         uint64_t deadline=timeout ? now_ns()+(uint64_t)*timeout*1000 : 0;
-        struct timespec end={.tv_sec=(time_t)(deadline/1000000000),.tv_nsec=(long)(deadline%1000000000)};
         while (!w.done) {
-            int e=timeout ? pthread_cond_timedwait(&w.event,&lock,&end) : pthread_cond_wait(&w.event,&lock);
+            int e=park(&w,timeout!=NULL,deadline);
             if (e==ETIMEDOUT && !w.done) {
                 Waiter **p=&s->first;
                 while (*p!=&w) p=&(*p)->next;
@@ -98,7 +186,6 @@ static int32_t wait_count(uint32_t id,int32_t need,uint32_t *timeout,int block) 
             uint64_t now=now_ns();
             *timeout=result ? 0 : (uint32_t)(now>=deadline ? 0 : (deadline-now)/1000);
         }
-        host_check(pthread_cond_destroy(&w.event));
         if (!--s->active && s->deleted) free(s);
     }
     pthread_mutex_unlock(&lock);
@@ -118,8 +205,8 @@ static ABI int32_t sem_signal(uint32_t id,int32_t count) {
         while (*p) {
             Waiter *w=*p;
             if (w->need>s->count) { p=&w->next; continue; }
-            s->count-=w->need; *p=w->next; w->done=1;
-            host_check(pthread_cond_signal(&w->event));
+            s->count-=w->need; *p=w->next;
+            wake(w);
         }
     }
     pthread_mutex_unlock(&lock);
@@ -129,8 +216,8 @@ static int32_t wake_all(Sema *s,int32_t result) {
     int32_t count=0;
     while (s->first) {
         Waiter *w=s->first; s->first=w->next;
-        w->result=result; w->done=1; ++count;
-        host_check(pthread_cond_signal(&w->event));
+        w->result=result; ++count;
+        wake(w);
     }
     return count;
 }
@@ -150,7 +237,7 @@ static ABI int32_t sem_cancel(uint32_t id,int32_t count,int32_t *waiters) {
 }
 static ABI int32_t sem_delete(uint32_t id) {
     pthread_mutex_lock(&lock);
-    Sema **p=&registry;
+    Sema **p=bucket(id);
     while (*p && (*p)->id!=id) p=&(*p)->next;
     if (!*p) { pthread_mutex_unlock(&lock); return ERR(3); }
     Sema *s=*p; *p=s->next; s->deleted=1; ++deleted;

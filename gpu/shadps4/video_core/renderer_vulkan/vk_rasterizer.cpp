@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
 #include <unordered_set>
 #include <chrono>
+#include <vector>
 #include <xxhash.h>
 #include "video_core/renderer_vulkan/ui_composition.h"
 #include "gow3_settings.h"
@@ -38,6 +40,59 @@
 namespace Vulkan {
 
 namespace {
+/// gow3 (Killzone): geometry-shader draws dropped for on-chip GS or stream-out (GsReject in
+/// vk_pipeline_cache.h). Each new ES/GS program pair is printed once, then every 5 s with drops
+/// a count, so a play session shows how often and which programs. GPU command thread only.
+void NoteSkippedGsDraw(const GsReject& reject, const AmdGpu::Regs& regs) {
+    struct Program {
+        u64 es, gs;
+        u32 onchip, strmout;
+        u64 count;
+    };
+    static std::vector<Program> programs;
+    static u64 window = 0, total = 0;
+    static auto last = std::chrono::steady_clock::now();
+    ++window;
+    ++total;
+    auto it = std::find_if(programs.begin(), programs.end(), [&](const Program& p) {
+        return p.es == reject.es_address && p.gs == reject.gs_address &&
+               p.onchip == reject.onchip && p.strmout == reject.strmout_config;
+    });
+    if (it != programs.end()) {
+        ++it->count;
+    } else if (programs.size() < 64) {
+        programs.push_back({reject.es_address, reject.gs_address, reject.onchip,
+                            reject.strmout_config, 1});
+        std::printf("Geometry shaders: draw skipped, program pair #%zu: ES %#llx GS %#llx, "
+                    "on-chip GS %u, VGT_STRMOUT_CONFIG %#x\n",
+                    programs.size(), static_cast<unsigned long long>(reject.es_address),
+                    static_cast<unsigned long long>(reject.gs_address), reject.onchip,
+                    reject.strmout_config);
+        // Where it draws, to tell which effect it is (a small layered target would be a
+        // volume, the full-size scene target a screen effect, none a stream-out-only pass).
+        const auto& cb = regs.color_buffers[0];
+        const auto& db = regs.depth_buffer;
+        std::printf("Geometry shaders:   color target 0 %#llx %ux%u, %u slices, data format %u; "
+                    "depth %#llx %ux%u\n",
+                    static_cast<unsigned long long>(cb ? cb.Address() : 0), cb ? cb.Pitch() : 0u,
+                    cb ? cb.Height() : 0u, cb ? cb.NumSlices() : 0u,
+                    cb ? static_cast<unsigned>(cb.GetDataFmt()) : 0u,
+                    static_cast<unsigned long long>(db.DepthValid() ? db.DepthAddress() : 0),
+                    db.DepthValid() ? db.Pitch() : 0u, db.DepthValid() ? db.Height() : 0u);
+        std::fflush(stdout);
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last >= std::chrono::seconds(5)) {
+        last = now;
+        std::printf("Geometry shaders: %llu draws skipped in the last 5 s (%llu in all, %zu "
+                    "program pairs)\n",
+                    static_cast<unsigned long long>(window), static_cast<unsigned long long>(total),
+                    programs.size());
+        std::fflush(stdout);
+        window = 0;
+    }
+}
+
 // gow3 (Killzone): see PendingDrawPolicy. GPU command thread only.
 PendingDrawPolicy pending_policy;
 // gow3 (Killzone): see ResCensus (GOW3_RES_CENSUS=1). GPU command thread only.
@@ -1136,6 +1191,9 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* pre
                          prepared->reg_checksum == liverpool->gfx_reg_checksum);
     }
     if (!pipeline) {
+        if (const auto reject = LastGsReject(); reject.rejected) {
+            NoteSkippedGsDraw(reject, Regs());
+        }
         static const u64 trace_addr = [] {
             const char* env = std::getenv("GOW3_TRACE_ADDR");
             return env ? std::strtoull(env, nullptr, 16) : 0ull;

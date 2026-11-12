@@ -95,6 +95,19 @@ namespace Vulkan {
 /// gow3: source line where the last graphics key refresh failed (vk_pipeline_cache.cpp).
 int PipelineFailLine();
 
+/// gow3 (Killzone): the last graphics key refresh on this thread refused a geometry-shader draw
+/// for a feature the recompiler lacks (on-chip GS, stream-out). Killzone reserves ES-GS and GS-VS
+/// rings (Guerrilla's 2013 postmortem, video memory table) and such draws are dropped, so the
+/// rasterizer counts them ("Geometry shaders:" lines) to find out which effect they belong to.
+struct GsReject {
+    bool rejected = false;
+    u32 onchip = 0;          ///< VGT_GS_MODE.ONCHIP
+    u32 strmout_config = 0;  ///< VGT_STRMOUT_CONFIG raw value
+    u64 es_address = 0;      ///< export (ES) program
+    u64 gs_address = 0;      ///< geometry program
+};
+GsReject LastGsReject();
+
 /// gow3: state of one graphics/compute pipeline selection. The GPU thread owns one
 /// (PipelineCache::sel); draw-preparation workers use their own with their register copies.
 struct PipelineSelection {

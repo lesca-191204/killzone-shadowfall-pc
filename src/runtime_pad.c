@@ -459,6 +459,10 @@ int runtime_pad_prompt_binding(unsigned icon, char *label, size_t size) {
         {"Return","ENTER"}, {"Keypad Enter","ENTER"}, {"Space","SPACE"}, {"Backspace","BKSP"},
         {"PageUp","PGUP"}, {"PageDown","PGDN"}, {"CapsLock","CAPS"}, {"Escape","ESC"},
         {"Up","UP"}, {"Down","DOWN"}, {"Left","LEFT"}, {"Right","RIGHT"}, {"Delete","DEL"}, {"Insert","INS"},
+        {"Keypad 0","KP0"}, {"Keypad 1","KP1"}, {"Keypad 2","KP2"}, {"Keypad 3","KP3"},
+        {"Keypad 4","KP4"}, {"Keypad 5","KP5"}, {"Keypad 6","KP6"}, {"Keypad 7","KP7"},
+        {"Keypad 8","KP8"}, {"Keypad 9","KP9"}, {"Keypad +","KPPLUS"}, {"Keypad -","KPMINUS"},
+        {"Keypad *","KPMUL"}, {"Keypad /","KPDIV"}, {"Keypad Decimal","KPDOT"},
     };
     for (size_t i=0;i<sizeof(short_names)/sizeof(*short_names);++i)
         if (!SDL_strcasecmp(name,short_names[i].name)) { name=short_names[i].label; break; }

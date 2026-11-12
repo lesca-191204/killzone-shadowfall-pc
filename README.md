@@ -1,3 +1,6 @@
+> 🎮 **Interested in my work? Check out my portfolio → [lesca-191204.github.io](https://lesca-191204.github.io)**<br>
+> ¿Te interesa mi trabajo? Mirá mi portfolio.
+
 # Killzone Shadow Fall for PC
 
 **English** | [Español](#español)
@@ -5,6 +8,12 @@
 [![Join the Ports Discord](https://img.shields.io/badge/Discord-Join%20the%20Ports%20Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/UYFcV5rbDw)
 [![Support the project and future ports](https://img.shields.io/badge/PayPal-Support%20the%20project%20%26%20future%20ports-00457C?logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/SantiagoLescano577)
 [![Latest release](https://img.shields.io/github/v/release/lesca-191204/killzone-shadowfall-pc?label=Download&color=2ea44f)](../../releases/latest)
+
+> 🆕 **New ports in development / Nuevos ports en desarrollo**
+>
+> 🎮 **[Killzone (PS2) · Native Online CO-OP Campaign](https://github.com/lesca-191204/killzone1-coop)**: the full
+> Killzone 1 campaign for 2 players online, on PC (experimental prototype) · la campaña completa de Killzone 1 para
+> 2 jugadores online, en PC (prototipo experimental).
 
 > 💬 **We have a Discord!** The community server is the place to **report problems**, tell us
 > **what you'd like to see next**, and **hear first about new ports** and how to support them.

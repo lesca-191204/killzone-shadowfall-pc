@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
+#include "gow3_copy.h"
 #include "shader_recompiler/info.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
 #include "video_core/renderer_vulkan/vk_runtime.h"
@@ -253,6 +255,47 @@ static bool ExecuteCopyShaderHLE(const Shader::Info& info, const AmdGpu::Compute
 // (Rasterizer::CopyBuffer). GOW3_KZ_COPY_HLE=0 keeps the dispatch.
 static constexpr u64 KZ_STREAM_COPY_HASH = 0xd1c4ffa0877dbef0;
 
+// memmove split across the copy threads and this one (Gow3Copy::ParallelFor). The GPU command
+// thread waits for the whole copy: one memmove of 160 MiB took 15 ms on an i9-14900HX, 36 ms when
+// the data moves up (a backward copy), against 7-13 ms on 5 threads. Overlapping moves go in waves
+// as wide as the overlap distance, in memmove's direction: no wave reads bytes it writes. Short
+// copies and short distances stay one memmove. GOW3_KZ_COPY_PARALLEL=0: always one memmove.
+// In a 36-minute session the copies averaged about 3 MiB (104,255 copies, 309 GB, none
+// overlapping), so most stay one memmove; the split serves the large ones.
+static void ParallelMove(u8* dst, const u8* src, u64 size) {
+    static const bool enabled = [] {
+        const char* env = std::getenv("GOW3_KZ_COPY_PARALLEL");
+        return !(env && env[0] == '0');
+    }();
+    constexpr u64 Chunk = 8_MB;
+    const u64 distance = dst > src ? u64(dst - src) : u64(src - dst);
+    if (!enabled || !Gow3Copy::Enabled() || size < 2 * Chunk || distance < Chunk) {
+        std::memmove(dst, src, size);
+        return;
+    }
+    // Chunks of at most Chunk <= distance bytes: each memcpy's own ranges never overlap.
+    const auto copy_range = [&](u64 at, u64 length) {
+        const u64 parts = (length + Chunk - 1) / Chunk;
+        Gow3Copy::ParallelFor(parts, [&](std::size_t i) {
+            const u64 offset = at + u64(i) * Chunk;
+            std::memcpy(dst + offset, src + offset, std::min(Chunk, at + length - offset));
+        });
+    };
+    if (distance >= size) {
+        copy_range(0, size);
+    } else if (dst < src) {
+        for (u64 at = 0; at < size; at += distance) {
+            copy_range(at, std::min(distance, size - at));
+        }
+    } else {
+        for (u64 end = size; end > 0;) {
+            const u64 wave = std::min(distance, end);
+            end -= wave;
+            copy_range(end, wave);
+        }
+    }
+}
+
 static bool ExecuteStreamCopyHLE(const Shader::Info& info, const AmdGpu::ComputeProgram& cs_program,
                                  Rasterizer& rasterizer) {
     static const bool enabled = [] {
@@ -290,14 +333,36 @@ static bool ExecuteStreamCopyHLE(const Shader::Info& info, const AmdGpu::Compute
         return false;
     }
     // The caches learn about the write first (its pages are then unprotected: no write faults).
+    using Clock = std::chrono::steady_clock;
+    const auto t0 = Clock::now();
     rasterizer.InvalidateMemory(dst.base_address, size);
-    std::memmove(reinterpret_cast<void*>(dst.base_address),
-                 reinterpret_cast<const void*>(src.base_address), size);
-    static std::atomic<u64> copied{0};
-    const u64 total = copied.fetch_add(size) + size;
-    if ((total >> 30) != ((total - size) >> 30)) {
-        std::printf("GPU: stream copies done in guest memory: %llu GiB so far\n",
-                    (unsigned long long)(total >> 30));
+    const auto t1 = Clock::now();
+    ParallelMove(reinterpret_cast<u8*>(dst.base_address),
+                 reinterpret_cast<const u8*>(src.base_address), size);
+    const auto t2 = Clock::now();
+    // Every 10 s with copies: how long the GPU command thread spent on them (GPU thread only).
+    static u64 copies = 0, bytes = 0, overlapping = 0;
+    static double invalidate_ms = 0, copy_ms = 0, worst_ms = 0;
+    static auto last = t2;
+    const double inv = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    const double cpy = std::chrono::duration<double, std::milli>(t2 - t1).count();
+    ++copies;
+    bytes += size;
+    overlapping += (dst.base_address > src.base_address ? dst.base_address - src.base_address
+                                                         : src.base_address - dst.base_address) < size;
+    invalidate_ms += inv;
+    copy_ms += cpy;
+    worst_ms = std::max(worst_ms, inv + cpy);
+    if (t2 - last >= std::chrono::seconds(10)) {
+        std::printf("GPU: stream copies in the last %.0f s: %llu (%llu overlapping), %llu MiB; GPU "
+                    "command thread %.1f ms (invalidate %.1f, copy %.1f), worst %.1f ms\n",
+                    std::chrono::duration<double>(t2 - last).count(), (unsigned long long)copies,
+                    (unsigned long long)overlapping, (unsigned long long)(bytes >> 20),
+                    invalidate_ms + copy_ms, invalidate_ms, copy_ms, worst_ms);
+        std::fflush(stdout);
+        copies = bytes = overlapping = 0;
+        invalidate_ms = copy_ms = worst_ms = 0;
+        last = t2;
     }
     return true;
 }
